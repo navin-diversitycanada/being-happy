@@ -3,38 +3,33 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 
 /**
- * Full Landing page (public) — paste entire component.
- * When logged in, this page immediately redirects to /index.
+ * Landing page (public). Redirects authenticated users:
+ * - admins -> /admin
+ * - regular users -> /index
  */
 export default function Landing() {
-  const { user, loading } = useAuth();
+  const { user, loading, role } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (!loading && user) {
-      // Authenticated users should not see landing — send to app index
-      navigate("/index", { replace: true });
+      if (role === "admin") navigate("/admin", { replace: true });
+      else navigate("/index", { replace: true });
     }
-  }, [user, loading, navigate]);
+  }, [user, loading, role, navigate]);
 
   if (loading) return <div style={{ padding: 24 }}>Loading...</div>;
   if (user) return null;
 
   return (
     <div className="landing">
-      {/* HERO */}
       <header className="landing-hero" role="banner" aria-label="Landing hero">
-        <div className="landing-hero-bg" style={{ backgroundImage: "url('/images/landing.jpg')" }}></div>
+        <div className="landing-hero-bg" style={{ backgroundImage: "url('/images/landing.jpg')" }} />
         <div className="landing-hero-overlay" />
         <div className="landing-hero-content">
           <h1>Be happier. Change your life.</h1>
-          <p className="landing-sub">
-            Being Happy brings simple, science-backed tools for mindfulness, sleep and stress —
-            personalized content to help you feel more present, rested, and resilient.
-          </p>
-          <div className="landing-cta-row">
-            <a className="landing-cta" href="/login">Try Being Happy for Free</a>
-          </div>
+          <p className="landing-sub">Being Happy brings simple, science-backed tools for mindfulness, sleep and stress.</p>
+          <div className="landing-cta-row"><a className="landing-cta" href="/login">Try Being Happy for Free</a></div>
         </div>
       </header>
 
@@ -82,7 +77,7 @@ export default function Landing() {
           <h2 className="section-title">Explore articles and tools for wellbeing.</h2>
           <div className="landing-blog-grid">
             <article className="card landing-blog-card" aria-labelledby="blog-1">
-              <img className="card-img" src="/images/1.jpg" alt="Blog image 1" />
+              <img className="card-img" src="/images/1.jpg" alt="Blog  1" />
               <div className="card-content">
                 <div className="card-meta">Relationships</div>
                 <div id="blog-1" className="card-title">10 mindful Thanksgiving gift ideas that express your gratitude</div>
@@ -90,7 +85,7 @@ export default function Landing() {
             </article>
 
             <article className="card landing-blog-card" aria-labelledby="blog-2">
-              <img className="card-img" src="/images/2.jpg" alt="Blog image 2" />
+              <img className="card-img" src="/images/2.jpg" alt="Blog  2" />
               <div className="card-content">
                 <div className="card-meta">Parenting</div>
                 <div id="blog-2" className="card-title">Is middle child syndrome real? What the science actually says</div>
@@ -98,7 +93,7 @@ export default function Landing() {
             </article>
 
             <article className="card landing-blog-card" aria-labelledby="blog-3">
-              <img className="card-img" src="/images/3.jpg" alt="Blog image 3" />
+              <img className="card-img" src="/images/3.jpg" alt="Blog  3" />
               <div className="card-content">
                 <div className="card-meta">Wellbeing</div>
                 <div id="blog-3" className="card-title">4 ways to bring soothing routines into your day</div>

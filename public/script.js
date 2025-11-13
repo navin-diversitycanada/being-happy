@@ -3,7 +3,7 @@
 // - Initializes sidemenu and carousels
 // - Wire arrow buttons
 // - Supports touch/swipe (mobile) and mouse drag
-// - MutationObserver to re-init when React mounts new carousels
+// - MutationObserver to re-init when React mounts new carousels or buttons
 // - Exposes window.bhInitCarousels() for manual re-init from React
 
 (function () {
@@ -110,14 +110,14 @@
 
   // Wire arrow buttons (idempotent)
   function wireCarouselButtons() {
-    // Remove previous handlers by cloning nodes
     document.querySelectorAll('.carousel-btn').forEach(btn => {
       if (btn._bhBtnInit) return;
-      // Mark as initialized so we don't duplicate
       btn._bhBtnInit = true;
-      btn.addEventListener('click', function () {
+      btn.addEventListener('click', function (ev) {
+        ev.preventDefault && ev.preventDefault();
         const car = btn.dataset.carousel;
         const dir = btn.dataset.dir;
+        // find the matching carousel element
         const carousel = document.querySelector(`.carousel[data-carousel="${car}"]`);
         if (!carousel) return;
 
@@ -266,14 +266,14 @@
     initAll();
   }
 
-  // Observe React mounting nodes and re-init when carousels are added
+  // Observe React mounting nodes and re-init when carousels or buttons are added
   const observer = new MutationObserver(debounce((mutations) => {
     let found = false;
     for (const m of mutations) {
       for (const node of m.addedNodes) {
         if (!(node instanceof HTMLElement)) continue;
-        if (node.matches && node.matches('.carousel')) { found = true; break; }
-        if (node.querySelector && node.querySelector('.carousel')) { found = true; break; }
+        if (node.matches && (node.matches('.carousel') || node.matches('.carousel-btn') || node.matches('.carousel-controls') || node.matches('.carousel-viewport'))) { found = true; break; }
+        if (node.querySelector && (node.querySelector('.carousel') || node.querySelector('.carousel-btn') || node.querySelector('.carousel-controls') || node.querySelector('.carousel-viewport'))) { found = true; break; }
       }
       if (found) break;
     }

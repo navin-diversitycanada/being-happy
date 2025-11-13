@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
+import { serverTimestamp } from "firebase/firestore";
 
 const AuthContext = createContext();
 
@@ -49,7 +50,16 @@ export function AuthProvider({ children }) {
 
   async function register(email, password, extra = {}) {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, "users", cred.user.uid), { role: "user", createdAt: Date.now(), ...extra });
+    await setDoc(doc(db, "users", cred.user.uid), {
+      role: "user",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      displayName: extra.displayName || "",
+      email: cred.user.email || "",
+      photoURL: cred.user.photoURL || "",
+      uid: cred.user.uid,
+      ...extra
+    });
     return cred;
   }
 

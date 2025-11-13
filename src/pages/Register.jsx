@@ -4,15 +4,16 @@ import { useNavigate, Link } from "react-router-dom";
 
 /**
  * Register component using AuthContext.register
- * - On success, it navigates to home (/) — AuthContext creates users/{uid} with role:'user'
- * - Copy to src/pages/Register.jsx
+ * - Hooks are called unconditionally (fixes rules-of-hooks error).
+ * - On success, navigates to home (/) — AuthContext creates users/{uid} with role:'user'
+ * - Copy to src/pages/Register.jsx (overwrite existing).
  */
 
 export default function Register() {
-  let auth;
-  try { auth = useAuth(); } catch (e) { auth = null; }
-
+  // Call the hook unconditionally to satisfy hooks rules
+  const auth = useAuth();
   const register = auth?.register;
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

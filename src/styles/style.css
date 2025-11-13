@@ -280,9 +280,9 @@ html, body {
 }
 
 /* --- Auth/Profile/Admin Forms --- */
+/* NOTE: removed .admin-panel button from the global full-width rule so admin buttons are not full-width */
 .auth-form,
-.profile-form,
-.admin-panel {
+.profile-form {
   max-width: 400px;
   width: 100%;
   margin: 32px auto;
@@ -292,9 +292,20 @@ html, body {
   box-sizing: border-box;
 }
 
+/* Make admin-panel visually wider like account-card */
+.admin-panel {
+  max-width: 1200px; /* increased to match account-card width */
+  width: 100%;
+  margin: 32px auto;
+  background: rgba(255,255,255,0.04);
+  border-radius: 18px;
+  padding: 40px; /* increased padding like account-card */
+  box-sizing: border-box;
+}
+
 @media (min-width: 900px) {
   .admin-panel {
-    max-width: 900px;
+    max-width: 1200px;
   }
 }
 
@@ -312,9 +323,9 @@ html, body {
   font-size: 1rem;
 }
 
+/* Buttons for auth/profile keep full-width as before */
 .auth-form button,
-.profile-form button,
-.admin-panel button {
+.profile-form button {
   width: 100%;
   padding: 12px;
   font-size: 18px;
@@ -327,55 +338,31 @@ html, body {
   cursor: pointer;
 }
 
-.auth-title {
-  text-align: center;
-  color: var(--cream);
-  font-family: 'Bebas Neue', cursive;
-  margin-bottom: 24px;
-}
-
-.socials {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.social-btn {
-  display: flex;
+/* Admin-specific button sizing: not full-width, small inline buttons (like account buttons) */
+.admin-extra .account-action-btn,
+.admin-extra .see-all-link,
+.admin-extra .admin-tab-btn,
+.admin-extra .admin-row .see-all-link {
+  width: auto;
+  padding: 8px 14px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  background: var(--card-bg);
-  color: var(--white);
-  border: none;
+}
+
+/* Default input/button style fallback */
+.auth-form input,
+.profile-form input,
+.admin-panel input,
+.admin-panel select,
+.admin-panel textarea {
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 12px;
   border-radius: 7px;
-  padding: 10px 0;
-  font-size: 16px;
-  cursor: pointer;
-}
-
-.auth-divider {
   border: none;
-  height: 1px;
-  background: rgba(255,255,255,0.08);
-  margin: 18px 0;
-}
-
-.switch {
-  text-align: center;
-  margin-top: 16px;
-}
-
-.switch a {
-  color: var(--cream);
-  text-decoration: underline;
-}
-
-.profile-form h2 {
-  color: var(--cream);
-  font-family: 'Bebas Neue', cursive;
-  text-align: center;
+  box-sizing: border-box;
+  font-size: 1rem;
 }
 
 /* --- Account Page --- */
@@ -1237,7 +1224,7 @@ html, body {
   margin-bottom:6px;
 }
 .admin-extra .wysiwyg-toolbar button {
-  background: rgba(0,0,0,0.05);
+      background: #714d66;
   border: 1px solid rgba(0,0,0,0.05);
   padding:6px 8px;
   border-radius:6px;
@@ -1251,6 +1238,7 @@ html, body {
   color: var(--purple);
   box-sizing: border-box;
   border: 1px solid rgba(0,0,0,0.04);
+  margin-bottom: 20px;
 }
 
 /* Subcategory & Category chips (white bg, purple text and X button) */
@@ -1625,7 +1613,7 @@ html, body {
   }
 }
 
-* Prevent horizontal overflow coming from account card children */
+/* Prevent horizontal overflow coming from account card children */
 .account-card {
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
@@ -1827,7 +1815,7 @@ html, body {
 /* ===== NEW SIDEMENU CTA STYLES (APPENDED) =====
    These styles only add the requested Login / Log out white-box look in the sidemenu,
    plus a subtle highlight for admin/account links when logged in.
-   They are appended at the end of your existing style.css so no previous rules are modified.
+   They are appended at the end of your existing style.css so no previous rules were modified.
 */
 
 /* sidemenu CTA (Login / Log out) — white background, purple text */
@@ -1906,3 +1894,282 @@ html, body {
 /* ===== END SIDEMENU CTA STYLES ===== */
 
 /* End of file */
+
+/* ------------------------------------------------------------------
+   New utility & admin-support styles added below.
+   These do not modify existing selectors; they provide classes used by
+   the AdminPanel component and replace inline style usage.
+-------------------------------------------------------------------*/
+
+/* Layout helpers used by AdminPanel (non-destructive additions) */
+.row { display: flex; align-items: center; }
+.col { display: flex; flex-direction: column; }
+.gap-8 { gap: 8px !important; }
+.gap-12 { gap: 12px !important; }
+
+/* Margin utilities */
+.mt-8 { margin-top: 8px !important; }
+.mt-12 { margin-top: 12px !important; }
+.mt-18 { margin-top: 18px !important; }
+.mt-22 { margin-top: 22px !important; }
+.mb-8 { margin-bottom: 8px !important; }
+.mb-12 { margin-bottom: 12px !important; }
+.mb-18 { margin-bottom: 18px !important; }
+.mb-22 { margin-bottom: 22px !important; }
+
+/* Simple text-input style used in admin forms (non-destructive) */
+.text-input {
+  width: 100%;
+  padding: 10px;
+  border-radius: 7px;
+  border: none;
+  box-sizing: border-box;
+  background: var(--white);
+  color: var(--purple);
+  margin-bottom: 8px;
+}
+
+/* WYSIWYG small helpers */
+.wys-btn {
+  background: rgba(0,0,0,0.05);
+  border: 1px solid rgba(0,0,0,0.05);
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: inherit;
+}
+
+/* Preview image helpers */
+.img-preview { width: 240px; border-radius: 6px; display: block; }
+.img-preview-wrap { margin-top: 12px; }
+
+/* Item thumbnail helper */
+.item-thumb { width: 72px; height: 54px; object-fit: cover; border-radius: 8px; margin-right: 12px; }
+
+/* Messages */
+.error-text { color: var(--salmon); margin-top: 8px; }
+.success-text { color: #4BB543; margin-top: 8px; }
+
+/* Ensure admin-tab active shows content (complements .admin-extra .admin-tab above) */
+.admin-tab.active { display: block !important; }
+
+/* Small utility for chips used in AdminPanel */
+.chip { display: inline-flex; align-items: center; gap: 8px; background: var(--white); color: var(--purple); padding: 6px 10px; border-radius: 999px; font-weight: 700; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+.chip .chip-x { background: transparent; border: none; color: var(--purple); font-size: 16px; cursor: pointer; padding: 0 4px; }
+
+/* Keep .admin-list spacing consistent when utilities are used */
+.admin-list.mt-12 { margin-top: 12px; }
+
+/* Small responsive adjustments for the new helpers */
+@media (max-width: 700px) {
+  .row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .img-preview { width: 100%; max-width: 100%; height: auto; }
+  .item-thumb { width: 100%; height: auto; max-width: 220px; }
+}
+
+.admin-panel .carousel-title {
+  font-size: 22px;
+  font-family: 'Bebas Neue', cursive, Arial, sans-serif;
+  font-weight: 700;
+  color: var(--cream);
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+/* Ensure post titles in admin listings use detail-title font family */
+.admin-panel .detail-title {
+  font-family: 'Lora', serif;
+  font-weight: 700;
+  color: var(--cream);
+  margin: 0;
+}
+
+/* Categories in admin listing: smaller detail-category-box look and capitalized */
+.admin-panel .detail-category-box {
+  display: inline-block;
+  background: var(--white);
+  color: var(--purple);
+  font-family: 'Inter', Arial, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 4px 10px;
+  box-shadow: 0 2px 8px rgba(54,45,82,0.10);
+  text-transform: capitalize;
+}
+
+/* Admin-row mobile responsiveness: stack blocks */
+.admin-panel .admin-row {
+  gap: 8px;
+}
+@media (max-width: 700px) {
+  .admin-panel .admin-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .admin-panel .admin-row-left {
+    flex-direction: row;
+    gap: 12px;
+  }
+  .admin-panel .admin-row-actions {
+    justify-content: flex-end;
+    margin-top: 6px;
+  }
+}
+
+/* Make admin inputs and search compact on narrow screens */
+@media (max-width: 700px) {
+  .admin-panel .text-input {
+    font-size: 14px;
+    padding: 8px;
+  }
+  .admin-panel .see-all-link,
+  .admin-panel .account-action-btn {
+    padding: 8px 12px;
+  }
+}
+
+/* Make sure category chips wrap on mobile */
+.admin-panel .category-chips { flex-wrap: wrap; gap: 6px; }
+
+/* Admin user role highlight */
+.admin-panel .admin-role-badge {
+  text-transform: capitalize;
+  font-weight: 700;
+}
+.admin-panel .admin-role-badge.admin {
+  color: salmon;
+}
+
+/* ---- Admin UX patches ---- */
+
+/* Form label styling: use detail-title font family (Lora) but keep white color */
+.admin-extra .form-label,
+.admin-extra .form-label[for] {
+  font-family: 'Lora', serif;
+  font-weight: 700;
+  color: var(--white);
+  display: block;
+  margin-bottom: 8px;
+}
+
+/* Inline checkboxes row */
+.inline-checkbox-row {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+/* Badges for post statuses */
+.badge {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--purple);
+  background: var(--white);
+}
+.badge-published { background: #4BB543; color: #fff; }
+.badge-unpublished { background: rgba(255,255,255,0.06); color: var(--white); border: 1px solid rgba(255,255,255,0.03); }
+.badge-featured { background: var(--purple); color: var(--cream); }
+
+/* Users grid (desktop) */
+.users-grid .user-row {
+  padding: 10px;
+  border-radius: 8px;
+}
+
+/* Responsive behavior for admin rows (mobile) */
+@media (max-width: 700px) {
+  /* Hide thumbnails for posts on mobile */
+  .admin-panel .item-thumb { display: none; }
+
+  /* Stack admin rows */
+  .admin-panel .admin-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  /* Users: on mobile stack the columns into rows (name, email, role, actions) */
+  .users-grid .user-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .users-grid .user-row div[style*="grid-template-columns"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Make action buttons full width on mobile */
+  .admin-panel .admin-row .admin-row-actions button,
+  .admin-panel .admin-row .admin-row-actions .see-all-link {
+    width: 100%;
+  }
+
+  /* Smaller form inputs */
+  .admin-panel .text-input { font-size: 14px; padding: 8px; }
+}
+
+/* Category display in categories listing: plain white, larger */
+.admin-panel .admin-list .admin-row .admin-row-left div {
+  color: var(--white);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* ensure the WYSIWYG uses pre-wrap so pasted plain text keeps linebreaks */
+.admin-extra .wysiwyg {
+  white-space: pre-wrap;
+}
+
+/* Give a little breathing room below labels in admin forms */
+.admin-extra .form-label { margin-top: 10px; margin-bottom: 10px; }
+
+/* Ensure admin form has reasonable spacing on small screens */
+@media (max-width: 700px) {
+  .admin-extra .admin-form { padding-left: 8px; padding-right: 8px; }
+}
+
+/* src/styles/admin-patches.css
+   Appended admin UI patches (load this file or append its content to your main style.css)
+*/
+
+/* Make admin listing detail-title color cream */
+.admin-panel .detail-title { color: var(--cream) !important; }
+
+/* Muted color change for admin extras: salmon and margin-left 0 */
+.admin-extra .muted { color: var(--salmon) !important; margin-left: 0 !important; }
+
+/* admin listing see-all-link remove left margin */
+.admin-extra .admin-row .see-all-link { margin-left: 0 !important; }
+
+/* Mobile admin layout adjustments:
+   - On small screens stack the admin-row-left and admin-row-actions vertically (full width)
+*/
+@media (max-width: 700px) {
+  .admin-panel .admin-row-left,
+  .admin-panel .admin-row-actions {
+    width: 100% !important;
+  }
+  .admin-panel .admin-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* Category listing mobile layout: place admin-row-left and admin-row-actions side-by-side 50/50 */
+@media (max-width: 700px) {
+  .admin-panel .admin-tab.active .admin-list .admin-row {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+  }
+  .admin-panel .admin-tab.active .admin-list .admin-row .admin-row-left,
+  .admin-panel .admin-tab.active .admin-list .admin-row .admin-row-actions {
+    width: 50%;
+  }
+}

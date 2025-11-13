@@ -1,50 +1,57 @@
-import React from "react";
+// src/pages/Featured.jsx
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { featured, findArticle, findAudio, findVideo, findDirectory } from "../data/mockData";
+import { listFeatured } from "../api/posts";
 
 /**
- * Featured page converted to JSX.
- * Place as src/pages/Featured.jsx
- * It resolves items by type and id to create the featured grid.
+ * Featured page — shows featured posts across types (published only)
+ * This page uses a grid layout (no carousel arrows). If you want a carousel here,
+ * we can change to a carousel and apply the same responsive controls logic.
  */
 
-function resolve(item) {
-  if (item.type === "article") return { ...findArticle(item.id), route: `/article/${item.id}`, label: "Article" };
-  if (item.type === "audio") return { ...findAudio(item.id), route: `/audio/${item.id}`, label: "Audio" };
-  if (item.type === "video") return { ...findVideo(item.id), route: `/video/${item.id}`, label: "Video" };
-  if (item.type === "directory") return { ...findDirectory(item.id), route: `/directory/${item.id}`, label: "Directory" };
-  return null;
-}
-
 export default function Featured() {
-  const resolved = featured.map(resolve).filter(Boolean);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    async function load() {
+      setLoading(true);
+      try {
+        const featured = await listFeatured(200, 1000); // try to collect up to 200 featured
+        if (!mounted) return;
+        setItems(featured || []);
+      } catch (err) {
+        console.error("Failed to load featured items", err);
+        if (!mounted) return;
+        setItems([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   return (
     <div className="main-content">
-      <div className="promo-box">
-        <span className="promo-icon big" aria-hidden="false" role="img" title="Featured">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M12 17.3l6.18 3.86-1.64-7.03L21 9.24l-7.19-.62L12 2 10.19 8.62 3 9.24l4.46 4.89L5.82 21.16 12 17.3z" fill="white" opacity="0.95"/>
-          </svg>
-        </span>
-        <div className="promo-text">
-          <div className="greeting">Featured</div>
-          <div className="promo-description">Hand-picked highlights</div>
-        </div>
-      </div>
-
+      <div className="promo-box"><div className="greeting">Featured</div></div>
       <div className="carousel-section">
-        <div className="carousel-header">
-          <span className="carousel-title">Featured — All</span>
-        </div>
         <div className="carousel-viewport">
           <div className="flex-card-grid" role="list">
-            {resolved.map((it, idx) => (
-              <Link key={idx} className="card" to={it.route}>
-                <img className="card-img" src={it.img || "/images/placeholder.png"} alt={it.title || "Featured"} />
+            {loading && <div style={{ padding: 12 }}>Loading…</div>}
+            {!loading && items.length === 0 && <div style={{ padding: 12 }}>No featured items yet.</div>}
+            {!loading && items.map(it => (
+              <Link
+                key={it.id}
+                className="card"
+                to={`/${it.type === "article" ? "article" : it.type}/${it.id}`}
+                role="listitem"
+              >
+                <img className="card-img" src={it.thumbnailUrl || it.imageUrl || "/images/placeholder.png"} alt={it.title} />
                 <div className="card-content">
                   <div className="card-title">{it.title}</div>
-                  <div className="card-meta">{it.type ? it.type.charAt(0).toUpperCase() + it.type.slice(1) : "Item"} • Featured</div>
+                  <div className="card-meta">{it.type} • Featured</div>
                 </div>
               </Link>
             ))}
