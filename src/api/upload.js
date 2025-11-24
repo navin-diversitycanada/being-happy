@@ -1,14 +1,32 @@
-// src/api/upload.js - PUBLIC upload helper (no auth required)
-// Usage: import { uploadImage } from "../api/upload";
-// await uploadImage(file, postId, workerUrl)
+// src/api/upload.js - Secure upload helper using Firebase ID Token
+// Usage: import { uploadImageSecure } from "../api/upload";
+// await uploadImageSecure(file, postId, workerUrl)
 //
 // workerUrl defaults to process.env.REACT_APP_UPLOAD_WORKER_URL
+// Requires firebase/auth initialized and user signed in.
 
-export async function uploadImage(file, postId = "unspecified", workerUrl) {
+import { getAuth } from "firebase/auth";
+
+export async function uploadImageSecure(file, postId = "unspecified", workerUrl) {
   if (!file) throw new Error("No file provided");
+  if (!navigator.onLine) throw new Error("Online connection required to upload images.");
 
   workerUrl = workerUrl || process.env.REACT_APP_UPLOAD_WORKER_URL;
   if (!workerUrl) throw new Error("Missing upload worker URL (REACT_APP_UPLOAD_WORKER_URL)");
+
+  const auth = getAuth();
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("Not authenticated. Sign in as an admin before uploading.");
+  }
+
+  let idToken;
+  try {
+    idToken = await user.getIdToken();
+  } catch (err) {
+    console.error("Failed to get ID token:", err);
+    throw new Error("Failed to obtain authentication token.");
+  }
 
   const fd = new FormData();
   fd.append("file", file);
@@ -16,7 +34,9 @@ export async function uploadImage(file, postId = "unspecified", workerUrl) {
 
   const resp = await fetch(workerUrl, {
     method: "POST",
-    // No Authorization or custom headers required
+    headers: {
+      Authorization: `Bearer ${idToken}`
+    },
     body: fd
   });
 

@@ -1,6 +1,6 @@
 import React, { useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 
 /**
  * Landing page (public). Redirects authenticated users:
@@ -29,7 +29,7 @@ export default function Landing() {
         <div className="landing-hero-content">
           <h1>Be happier. Change your life.</h1>
           <p className="landing-sub">Being Happy brings simple, science-backed tools for mindfulness, sleep and stress.</p>
-          <div className="landing-cta-row"><a className="landing-cta" href="/login">Try Being Happy for Free</a></div>
+          <div className="landing-cta-row"><Link className="landing-cta" to="/index">Try Being Happy for Free</Link></div>
         </div>
       </header>
 

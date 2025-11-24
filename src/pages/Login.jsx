@@ -3,16 +3,32 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 /**
- * Login page — uses AuthContext.login
+ * Login page — uses AuthContext.login and social sign-ins exposed by AuthContext.
+ * If an account is disabled, AuthContext.disabledMessage will contain the message.
+ * If the user has just registered, we show a verification-sent message.
  */
 export default function Login() {
-  const { login, user, role, loading } = useAuth();
+  const { login, signInWithGoogle, signInWithFacebook, user, role, loading, disabledMessage, logout } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [err, setErr] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || null;
+  const resetSuccess = location.state?.resetSuccess || false;
+  const verifySent = location.state?.verifySent || false;
+
+  useEffect(() => {
+    if (resetSuccess) {
+      setErr("Password updated — please log in with your new password.");
+    }
+  }, [resetSuccess]);
+
+  useEffect(() => {
+    if (verifySent) {
+      setErr("Verification email sent — check your inbox and follow the link to complete registration.");
+    }
+  }, [verifySent]);
 
   useEffect(() => {
     if (!loading && user && role) {
@@ -22,13 +38,58 @@ export default function Login() {
     }
   }, [user, role, loading, from, navigate]);
 
+  useEffect(() => {
+    // If AuthContext has disabledMessage (set when a disabled or unverified user attempted to sign in),
+    // show it to the user in the form area.
+    if (disabledMessage) {
+      setErr(disabledMessage);
+    }
+  }, [disabledMessage]);
+
   async function handleSubmit(e) {
     e.preventDefault();
     setErr("");
     try {
-      await login(email, password);
+      const cred = await login(email, password);
+      // If the email/password account isn't verified, ensure we do not leave them signed in.
+      if (cred && cred.user && !cred.user.emailVerified) {
+        // Sign out and show explicit message
+        try { await logout(); } catch (err) { /* ignore */ }
+        setErr("Verify to login — check your email for the verification link.");
+        return;
+      }
+      // Otherwise the onAuthStateChanged handler will redirect when user state is ready.
     } catch (error) {
-      setErr(error.message || "Login failed");
+      setErr("Error logging in. Please check your credentials.");
+      console.error("Login error:", error);
+    }
+  }
+
+  async function handleGoogle() {
+    setErr("");
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      if (err && err.message && err.message.toLowerCase().includes("disabled")) {
+        setErr("Your account is disabled");
+      } else {
+        setErr("Social login failed. Please try again.");
+      }
+      console.error("Google sign-in error:", err);
+    }
+  }
+
+  async function handleFacebook() {
+    setErr("");
+    try {
+      await signInWithFacebook();
+    } catch (err) {
+      if (err && err.message && err.message.toLowerCase().includes("disabled")) {
+        setErr("Your account is disabled");
+      } else {
+        setErr("Social login failed. Please try again.");
+      }
+      console.error("Facebook sign-in error:", err);
     }
   }
 
@@ -38,9 +99,8 @@ export default function Login() {
         <h2 className="auth-title">Login to Being Happy</h2>
 
         <div className="socials">
-          <button className="social-btn" type="button"><img src="/images/google.svg" alt="" width="18" /> Continue with Google</button>
-          <button className="social-btn" type="button"><img src="/images/facebook.svg" alt="" width="18" /> Continue with Facebook</button>
-          <button className="social-btn" type="button"><img src="/images/apple.svg" alt="" width="18" /> Continue with Apple</button>
+          <button className="social-btn" type="button" onClick={handleGoogle}><img src="/images/google.svg" alt="" width="18" /> Continue with Google</button>
+          <button className="social-btn" type="button" onClick={handleFacebook}><img src="/images/facebook.svg" alt="" width="18" /> Continue with Facebook</button>
         </div>
 
         <hr className="auth-divider" />
@@ -49,7 +109,12 @@ export default function Login() {
         <button type="submit">Login</button>
 
         {err && <div style={{ color: "salmon", marginTop: 8 }}>{err}</div>}
-        <div className="switch">Don't have an account? <Link to="/register">Register</Link></div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+          <Link className="link-badge" to="/register">Register</Link>
+          <Link className="link-badge" to="/reset-password">Forgot password?</Link>
+        </div>
+
       </form>
     </div>
   );

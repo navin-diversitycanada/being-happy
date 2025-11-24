@@ -4,13 +4,12 @@ import { useNavigate, Link } from "react-router-dom";
 
 /**
  * Register component using AuthContext.register
- * - Hooks are called unconditionally (fixes rules-of-hooks error).
- * - On success, navigates to home (/) — AuthContext creates users/{uid} with role:'user'
- * - Copy to src/pages/Register.jsx (overwrite existing).
+ * - Sends verification email at registration. User must verify before being allowed to log in.
+ * - UX change: the Register button keeps its label ("Register") at all times.
+ *   While the request is in progress the button is disabled (no label change).
+ * - All messages/errors appear below the button in salmon color.
  */
-
 export default function Register() {
-  // Call the hook unconditionally to satisfy hooks rules
   const auth = useAuth();
   const register = auth?.register;
 
@@ -19,6 +18,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
 
   async function handleSubmit(e) {
@@ -33,10 +33,37 @@ export default function Register() {
       return;
     }
     try {
+      setBusy(true);
       await register(email, password, { displayName: name });
-      navigate("/", { replace: true });
+      // After successful registration, we send the verification link inside register()
+      // and redirect the user to the login page with a friendly notice.
+      navigate("/login", { replace: true, state: { verifySent: true } });
     } catch (error) {
-      setErr(error.message || "Registration failed");
+      // Show friendly message returned by AuthContext.register
+      setErr(error?.message || "Registration failed. Please try again.");
+      console.error("Register error:", error);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleGoogle() {
+    try {
+      await auth.signInWithGoogle();
+      navigate("/", { replace: true });
+    } catch (err) {
+      console.error("Google sign-in error:", err);
+      setErr("Social login failed. Please try again.");
+    }
+  }
+
+  async function handleFacebook() {
+    try {
+      await auth.signInWithFacebook();
+      navigate("/", { replace: true });
+    } catch (err) {
+      console.error("Facebook sign-in error:", err);
+      setErr("Social login failed. Please try again.");
     }
   }
 
@@ -45,18 +72,72 @@ export default function Register() {
       <form className="auth-form" onSubmit={handleSubmit}>
         <h2 className="auth-title">Register for Being Happy</h2>
         <div className="socials">
-          <button className="social-btn" type="button"><img src="/images/google.svg" alt="" width="18" /> Continue with Google</button>
-          <button className="social-btn" type="button"><img src="/images/facebook.svg" alt="" width="18" /> Continue with Facebook</button>
-          <button className="social-btn" type="button"><img src="/images/apple.svg" alt="" width="18" /> Continue with Apple</button>
+          <button
+            className="social-btn"
+            type="button"
+            onClick={handleGoogle}
+            disabled={busy}
+          >
+            <img src="/images/google.svg" alt="" width="18" /> Continue with Google
+          </button>
+          <button
+            className="social-btn"
+            type="button"
+            onClick={handleFacebook}
+            disabled={busy}
+          >
+            <img src="/images/facebook.svg" alt="" width="18" /> Continue with Facebook
+          </button>
         </div>
         <hr className="auth-divider" />
-        <input type="text" placeholder="Full Name" required value={name} onChange={(e) => setName(e.target.value)} />
-        <input type="email" placeholder="Email" required value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input type="password" placeholder="Password" required value={password} onChange={(e) => setPassword(e.target.value)} />
-        <input type="password" placeholder="Confirm Password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-        <button type="submit">Register</button>
+        <input
+          type="text"
+          placeholder="Full Name"
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          disabled={busy}
+        />
+        <input
+          type="email"
+          placeholder="Email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={busy}
+        />
+        <input
+          type="password"
+          placeholder="Password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={busy}
+        />
+        <input
+          type="password"
+          placeholder="Confirm Password"
+          required
+          value={confirm}
+          onChange={(e) => setConfirm(e.target.value)}
+          disabled={busy}
+        />
+
+        {/* Button label remains "Register" at all times; we only disable it while busy */}
+        <button
+          type="submit"
+          disabled={busy}
+          aria-busy={busy}
+        >
+          Register
+        </button>
+
+        {/* All messages/errors appear below the button in salmon color */}
         {err && <div style={{ color: "salmon", marginTop: 8 }}>{err}</div>}
-        <div className="switch">Already have an account? <Link to="/login">Login</Link></div>
+
+        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+          <Link className="link-badge" to="/login">Already have an account? Login</Link>
+        </div>
       </form>
     </div>
   );

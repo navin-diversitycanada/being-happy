@@ -1,5 +1,5 @@
 // src/api/posts.js
-// Firestore helpers (modular v9) - added listByCategory with safe fallback
+// Firestore helpers (modular v9) - added online checks for write operations
 import {
   collection,
   addDoc,
@@ -19,6 +19,7 @@ import { db } from "../firebase";
 const postsCol = collection(db, "posts");
 
 export async function createPost(data) {
+  if (!navigator.onLine) throw new Error("Online connection required to create posts.");
   const payload = {
     ...data,
     createdAt: serverTimestamp(),
@@ -29,11 +30,13 @@ export async function createPost(data) {
 }
 
 export async function updatePost(id, patch) {
+  if (!navigator.onLine) throw new Error("Online connection required to update posts.");
   const ref = doc(db, "posts", id);
   await updateDoc(ref, { ...patch, updatedAt: serverTimestamp() });
 }
 
 export async function deletePost(id) {
+  if (!navigator.onLine) throw new Error("Online connection required to delete posts.");
   const ref = doc(db, "posts", id);
   await deleteDoc(ref);
 }
@@ -62,9 +65,9 @@ function timestampToMillis(t) {
  * - Tries the indexed query first (efficient). If it fails (missing composite index),
  *   falls back to fetch-by-type then client-side filter/sort.
  *
- * limitN defaults to 20.
+ * limitN defaults to 12 now (per request).
  */
-export async function listByType(type, limitN = 20) {
+export async function listByType(type, limitN = 12) {
   if (!type) return [];
   try {
     const q = query(
@@ -95,11 +98,7 @@ export async function listByType(type, limitN = 20) {
 
 /**
  * listByCategory
- * - Fetch published posts that include a given category id in their categories array.
- * - Optionally filter by type (e.g., 'article', 'video', 'audio', 'directory').
- * - Uses array-contains queries; if index missing, falls back to reading a window and filtering client-side.
- *
- * Note: array-contains + orderBy(publishedAt) may require a composite index.
+ * unchanged
  */
 export async function listByCategory(categoryId, type = null, limitN = 200, fetchWindow = 800) {
   if (!categoryId) return [];
@@ -144,12 +143,9 @@ export async function listByCategory(categoryId, type = null, limitN = 200, fetc
 }
 
 /**
- * listFeatured
- * - Returns published items flagged as featured across all types.
- * - We read a window ordered by publishedAt (single-field) and filter client-side.
- * - limitN defaults to 20.
+ * listFeatured: default limit now 12 (per request)
  */
-export async function listFeatured(limitN = 20, fetchWindow = 400) {
+export async function listFeatured(limitN = 12, fetchWindow = 400) {
   try {
     const q = query(postsCol, orderBy("publishedAt", "desc"), limit(fetchWindow));
     const snap = await getDocs(q);
@@ -164,7 +160,7 @@ export async function listFeatured(limitN = 20, fetchWindow = 400) {
 }
 
 /**
- * Admin helpers
+ * Admin helpers unchanged
  */
 export async function listByTypeAdmin(type, limitN = 200) {
   try {

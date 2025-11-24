@@ -196,11 +196,12 @@ html, body {
   margin: 18px 0 18px 0;
   padding: 18px 16px;
   display: flex;
-  align-items: center;
-  gap: 16px;
+  align-items: baseline;
+  gap: 5px;
   opacity: 0;
   transform: translateY(-40px);
   animation: promoFadeIn 0.9s ease-out 0.2s forwards;
+      flex-direction: column;
 }
 
 @keyframes promoFadeIn {
@@ -248,10 +249,11 @@ html, body {
 
 .promo-text {
   flex: 1;
-  font-size: 18px;
+  font-size: 14px;
   color: var(--white);
   font-weight: 400;
   line-height: 1.4;
+  
   font-family: 'Inter', Arial, sans-serif;
 }
 
@@ -263,13 +265,14 @@ html, body {
   margin: 3px 0 3px 0;
   color: var(--cream);
   letter-spacing: 0.2px;
-  opacity: 0;
-  animation: fadeInUp 0.8s 0.7s forwards;
+  opacity: 1;
+  
   transform: translateY(12px);
 }
 
 .promo-description {
-  margin-top: 8px;
+  margin-top: 15px;
+   font-size: 14px;
 }
 
 @keyframes fadeInUp {
@@ -989,6 +992,7 @@ html, body {
   object-fit: cover;
   background: #888;
   display: block;
+  margin-top: 15px;
 }
 
 .detail-title {
@@ -2173,3 +2177,579 @@ html, body {
     width: 50%;
   }
 }
+
+
+
+/* Link badge pills used for auth links and small inline links */
+.link-badge {
+  display: inline-block;
+  background: var(--cream);
+  color: var(--purple);
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  text-decoration: none !important;
+  font-family: 'Bebas Neue', cursive, Arial, sans-serif;
+  text-transform: none;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(7,24,46,0.06);
+}
+.link-badge:hover,
+.link-badge:focus {
+  background: #fbf7f2;
+  text-decoration: none !important;
+}
+
+
+/* Prevent long names and text from overflowing the viewport */
+.account-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+  display: block;
+}
+
+/* Ensure main content text wraps and doesn't overflow horizontally */
+.main-content, .card, .detail-card, .account-card, .promo-box {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* Make sure large titles trim or wrap safely on small viewports */
+.detail-title, div, span, button, .greeting,.promo-box, .promo-description, .card-title, .detail-description,.promo-description{
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* On very small screens, allow account-name to wrap to two lines if needed */
+@media (max-width: 420px) {
+  .account-name {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* Prevent inline buttons from causing horizontal overflow */
+.account-actions,
+.admin-row,
+.admin-row-left,
+.admin-row-actions {
+  min-width: 0;
+}
+
+/* Ensure images are responsive (safety net) */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+
+/* Home-card (no image) used on Home carousels for short excerpt cards */
+.home-card {
+  background: var(--card-bg);
+  border-radius: 14px;
+  flex: 0 0 calc(25% - 18px);
+  margin-right: 24px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(54,45,82,0.12);
+  min-width: 0;
+  max-width: none;
+  text-decoration: none;
+  color: inherit;
+}
+
+.home-card-body { display: flex; flex-direction: column; gap: 8px; }
+
+.home-card-title {
+  font-family: 'Lora', serif;
+  font-weight: 800;
+  font-size: 18px;
+  color: var(--cream);
+  line-height: 1.15;
+  margin-bottom: 2px;
+}
+
+/* excerpt clamp: two lines */
+.home-card-excerpt {
+  font-size: 14px;
+  color: rgba(255,255,255,0.88);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+/* Directory placeholder image sizing safety */
+img[src$="directoryplaceholder.png"], img[src*="directoryplaceholder.png"] {
+  object-fit: cover;
+}
+
+/* Mobile adjustments (2-up on small screens) */
+@media (max-width: 700px) {
+  .home-card { flex: 0 0 calc(50% - 8px); margin-right: 8px; }
+}
+
+
+/* --- excerpt: only the changed/added CSS rules are shown here (append to your style.css) --- */
+/* Make card titles clamp to two lines with ellipsis across all card variants */
+.card-title,
+.home-card-title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* clamp to 2 lines */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+/* Ensure directory titles also clamp to 2 lines (was previously 3) */
+.carousel-directory .directory-title,
+.card.directory-card .directory-title {
+  -webkit-line-clamp: 2;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.1;
+}
+
+/* Home-card categories line (salmon color) shown under the title */
+.home-card-categories {
+  color: var(--salmon);
+  font-size: 13px;
+  margin-top: 4px;
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+
+/* Slightly tighten card-title spacing on small screens so clamp behaves consistently */
+@media (max-width: 900px) {
+  .card-title,
+  .home-card-title {
+    font-size: 16px;
+  }
+}
+
+/* Ensure directory-card without image keeps expected padding and centers content */
+.card.directory-card .directory-content {
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+/* If a directory-card contains an img (featured ones) keep consistent spacing */
+.card.directory-card img.card-img {
+  border-radius: 12px 12px 0 0;
+}
+
+/* End of appended CSS changes */
+
+/* --- APPENDED CSS CHANGES - ensure these are placed near the end of style.css --- */
+
+/* Clamp titles everywhere to 2 lines */
+.card-title,
+.home-card-title,
+.carousel-directory .directory-title,
+.card.directory-card .directory-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; /* 2 lines */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+/* Excerpt inside normal .card used by Home media cards */
+.card-excerpt {
+  font-size: 14px;
+  color: rgba(255,255,255,0.88);
+  margin-top: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+/* Home card categories (salmon color) used under title */
+.home-card-categories {
+  color: var(--salmon);
+  font-size: 13px;
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+/* Ensure .card elements used in home carousels have same sizing as carousel .card */
+.carousel .card {
+  /* keep the same flex sizing used elsewhere so widths match */
+  flex: 0 0 calc(25% - 18px);
+  margin-right: 24px;
+}
+
+/* Directory card (image-less) content padding and alignment so grid looks consistent */
+.card.directory-card .directory-content {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* If a directory card contains an image (featured carousel) style it consistently */
+.carousel-directory .card.directory-card img.card-img {
+  border-radius: 12px 12px 0 0;
+}
+
+/* On small screens keep 2-up behavior for cards and ensure clamp works */
+@media (max-width: 700px) {
+  .carousel .card {
+    flex: 0 0 calc(50% - 8px);
+    margin-right: 8px;
+  }
+
+  .card-excerpt {
+    -webkit-line-clamp: 3;
+  }
+
+  .card.directory-card .directory-content {
+    padding: 12px;
+  }
+}
+
+/* End of appended CSS changes */
+
+
+/* --- Appended / modified CSS rules --- */
+
+/* Category label used across card variants (salmon color, bold, left aligned) */
+.card-categories {
+  color: var(--salmon);
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 6px;
+  text-align: left;
+}
+
+/* Ensure .card-meta remains cream for fallback metadata; use .card-categories for category labels */
+.card-meta {
+  color: var(--cream);
+  font-size: 14px;
+}
+
+/* Card excerpt clamp: 2 lines across home/media cards */
+.card-excerpt {
+  font-size: 14px;
+  color: rgba(255,255,255,0.88);
+  margin-top: 8px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2; /* changed to 2 lines */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+/* Home / other cards category line preserved (backwards compatibility) */
+.home-card-categories {
+  color: var(--salmon);
+  font-size: 13px;
+  margin-top: 6px;
+  font-weight: 700;
+}
+
+/* Override: directory cards on Home should use the same card-bg (not purple gradient),
+   left-aligned content and show categories under the title. */
+.directory-card-home {
+  background: var(--card-bg) !important;
+  box-shadow: 0 2px 8px rgba(54,45,82,0.12);
+  padding: 18px;
+  min-height: 120px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+/* Align directory title left and clamp to 2 lines */
+.directory-card-home .directory-title {
+  text-align: left;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Keep existing directory-card gradient for other pages (directories page grid/featured),
+   but Home directory use directory-card-home class to override. */
+/* No change here to .card.directory-card - it still exists for the main grid/carousels */
+
+/* Detail pages: make links inside content a salmon color (stand out) */
+.detail-description a {
+  color: var(--salmon);
+  text-decoration: underline;
+}
+
+/* Ensure directory meta (tags) that remain use the category styling where appropriate */
+.directory-meta {
+  color: var(--cream);
+}
+
+/* Clamp card titles everywhere to 2 lines (already present; reinforce) */
+.card-title,
+.home-card-title,
+.carousel-directory .directory-title,
+.card.directory-card .directory-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; /* 2 lines */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+/* Ensure .card elements used in home carousels have same sizing as carousel .card */
+.carousel .card {
+  flex: 0 0 calc(25% - 18px);
+  margin-right: 24px;
+}
+
+/* Make sure home directory card content left aligns inside its card */
+.directory-card-home .directory-content {
+  align-items: flex-start;
+  text-align: left;
+}
+
+/* Small-screen adjustments to keep layout consistent */
+@media (max-width: 700px) {
+  .carousel .card {
+    flex: 0 0 calc(50% - 8px);
+    margin-right: 8px;
+  }
+  .card-excerpt {
+    -webkit-line-clamp: 2;
+  }
+  .directory-card-home {
+    padding: 12px;
+  }
+}
+
+
+/* --- Appended / modified CSS rules --- */
+
+/* Directory card on Home: reuse standard .card/.card-content spacing so visuals match other cards.
+   Previously this class added its own padding which caused extra spacing; remove that padding and
+   let .card-content provide consistent padding. Keep background override so Home directories are not purple. */
+.directory-card-home {
+  background: var(--card-bg) !important;
+  box-shadow: 0 2px 8px rgba(54,45,82,0.12);
+  padding: 0; /* let .card-content handle spacing */
+  min-height: unset;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-start;
+  border-radius: 18px;
+}
+
+/* Ensure the card-content inside the home directory card left aligns */
+.directory-card-home .card-content {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+/* Align directory title left and clamp to 2 lines */
+.directory-card-home .card-title {
+  text-align: left;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Keep existing directory-card gradient for other pages (directories page grid/featured),
+   but Home directory uses directory-card-home class to override. */
+
+/* Narrow scope: only links inside the detail-description block should be salmon.
+   This replaces prior broader selectors that colored links in many places. */
+.detail-description a {
+  color: var(--salmon);
+  text-decoration: underline;
+}
+
+/* Category label used across card variants (salmon color, bold, left aligned) */
+.card-categories {
+  color: var(--salmon);
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 6px;
+  text-align: left;
+}
+
+/* Keep .card-meta fallback */
+.card-meta {
+  color: var(--cream);
+  font-size: 14px;
+}
+
+/* Clamp card titles everywhere to 2 lines (reinforce) */
+.card-title,
+.home-card-title,
+.carousel-directory .directory-title,
+.card.directory-card .directory-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2; /* 2 lines */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.15;
+  word-break: break-word;
+}
+
+/* Ensure .card elements used in carousels keep same sizing */
+.carousel .card {
+  flex: 0 0 calc(25% - 18px);
+  margin-right: 24px;
+}
+
+/* Small-screen adjustments to keep layout consistent */
+@media (max-width: 700px) {
+  .carousel .card {
+    flex: 0 0 calc(50% - 8px);
+    margin-right: 8px;
+  }
+  .card-excerpt {
+    -webkit-line-clamp: 2;
+  }
+  .directory-card-home {
+    padding: 0;
+  }
+}
+
+
+/* src/styles/style.css (partial shown: only the changed snippets appended/replaced below)
+   - success-text now uses salmon color so success messages match the requested color.
+   - account-message default messages also display as salmon to make success/notice messages consistent.
+   - This file should be appended/merged into your existing style.css (we place the changed/added rules here).
+*/
+
+/* Replace previous success-text color (was green) with salmon for consistent success/notice color */
+.success-text { color: var(--salmon); margin-top: 8px; }
+
+/* Make account-message default use salmon for transient notices (matches request to show updated messages in salmon) */
+.account-message { color: var(--salmon); margin-top: 12px; font-size: 1rem; text-align: center; }
+
+/* Ensure card-categories (used for the category line on cards) stays salmon & bold */
+.card-categories {
+  color: var(--salmon);
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 6px;
+  text-align: left;
+}
+
+/* Ensure the smaller muted text used in admin listings keeps font-size 13 where needed */
+.admin-extra .muted { color: var(--salmon) !important; margin-left: 0 !important; }
+
+/* Keep the error-text as salmon (already set) but ensure it's distinct if needed */
+.error-text { color: var(--salmon); margin-top: 8px; }
+
+/* Reduce role/status font-size helper (if inline styles missed a spot) */
+.admin-panel .user-role-small {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-extra .inline-checkbox-row label {
+  white-space: nowrap;
+}
+
+/* (excerpt) Additions / adjustments for heading spacing, link color in article content, image spacing */
+
+/* Ensure larger spacing above detail images */
+.detail-img {
+  margin-top: 24px; /* increased from 15px */
+}
+
+/* Make page title (H1 .detail-title) have extra top/bottom spacing so H1 doesn't feel cramped */
+.detail-title {
+  margin-top: 18px;
+  margin-bottom: 14px;
+  line-height: 1.05;
+}
+
+/* H2 / H3 inside article/detail content: spacing + letter-spacing + inherited title look */
+.article-content h2,
+.article-content h3,
+.detail-description h2,
+.detail-description h3,
+.directory-content h2,
+.directory-content h3 {
+  font-family: 'Lora', serif;
+  font-weight: 900;
+  color: var(--cream);
+  margin-top: 18px;
+  margin-bottom: 12px;
+  line-height: 1.1;
+  letter-spacing: 0.6px; /* increased letter spacing for H2/H3 */
+}
+
+/* Slight size adjustments for H2/H3 if not already set inline by transformer */
+.article-content h2,
+.detail-description h2 { font-size: 28px; }
+.article-content h3,
+.detail-description h3 { font-size: 24px; }
+
+/* Ensure horizontal rules inside content have extra vertical spacing and subtle color */
+.article-content hr,
+.detail-description hr,
+.directory-content hr {
+  margin: 18px 0;
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+/* Make links in article content use salmon color like directory pages */
+.article-content a,
+.detail-description a {
+  color: var(--salmon);
+  text-decoration: underline;
+}
+
+/* Also ensure audio/video/detail description links get salmon */
+.detail-description a,
+.directory-content a,
+.article-content a {
+  color: var(--salmon);
+  text-decoration: underline;
+}
+
+/* Provide a little more breathing room before the content block itself */
+.article-content,
+.detail-description,
+.directory-content {
+  margin-top: 10px;
+  margin-bottom: 18px;
+}
+
+/* End of appended snippet */

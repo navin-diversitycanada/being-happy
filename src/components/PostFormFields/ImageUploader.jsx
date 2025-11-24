@@ -1,19 +1,17 @@
 import React, { useRef, useState } from "react";
-import { uploadImage } from "../../api/upload";
+import { uploadImageSecure } from "../../api/upload";
 
 /**
- * ImageUploader component
+ * ImageUploader component (Admin use)
  * Props:
- * - workerUrl (string) required
+ * - workerUrl (string) optional - defaults to REACT_APP_UPLOAD_WORKER_URL
  * - postId (string) optional
- * - uploadKey (string) optional - recommended to pass explicitly (do NOT embed in public builds)
- * - onUploaded(result) optional callback
- * - maxFileSize (number) default 6 MiB
+ * - onUploaded(result) optional callback; result contains { imageUrl, key }
+ * - maxFileSize default 6 MiB
  */
 export default function ImageUploader({
   workerUrl,
   postId = "unspecified",
-  uploadKey = null,
   onUploaded,
   maxFileSize = 6 * 1024 * 1024
 }) {
@@ -43,8 +41,7 @@ export default function ImageUploader({
 
     setUploading(true);
     try {
-      // Pass uploadKey explicitly if provided, otherwise uploadImage will read from env (for testing)
-      const res = await uploadImage(file, postId, workerUrl, uploadKey);
+      const res = await uploadImageSecure(file, postId, workerUrl);
       setUploading(false);
       if (onUploaded) onUploaded(res);
     } catch (err) {
@@ -55,7 +52,7 @@ export default function ImageUploader({
 
   return (
     <div>
-      <label className="form-label">Image (upload)</label>
+      <label className="form-label">Image (admin upload)</label>
       <input type="file" accept="image/*" ref={fileRef} onChange={handleChange} />
       {uploading && <div style={{ marginTop: 8 }}>Uploading…</div>}
       {error && <div style={{ color: "salmon", marginTop: 8 }}>{error}</div>}

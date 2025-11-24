@@ -1,28 +1,18 @@
-// src/pages/Account.jsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { Link } from "react-router-dom";
-import { listFavorites, removeFavorite as apiRemoveFavorite } from "../api/favorites";
-
-/**
- * Account page — now reads saved items from Firestore users/{uid}/favorites
- * - Pagination (page size 10) and search.
- * - Existing saved-items UI replaced with live content when logged in.
- */
-
-function localFavs() {
-  try { const raw = localStorage.getItem("bh_favorites"); return raw ? JSON.parse(raw) : []; } catch (e) { return []; }
-}
+import { Link, useNavigate } from "react-router-dom";
+import { listFavorites } from "../api/favorites";
+import Breadcrumbs from "../components/Breadcrumbs";
 
 export default function Account() {
   const auth = useAuth();
   const user = auth?.user || null;
   const uid = user?.uid || null;
+  const navigate = useNavigate();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [activeSection, setActiveSection] = useState(null);
-  const [profileSrc, setProfileSrc] = useState("/images/profile.jpg");
 
   // Saved items state
   const [saved, setSaved] = useState([]);
@@ -32,23 +22,39 @@ export default function Account() {
   const [loadingSaved, setLoadingSaved] = useState(false);
   const PAGE_SIZE = 10;
 
+  // Profile edit form
+  const [newName, setNewName] = useState("");
+  const [changingName, setChangingName] = useState(false);
+
+  // Reset password messages
+  const [resetMsg, setResetMsg] = useState("");
+
+  // New: user-visible messages for profile ops (use salmon color via CSS)
+  const [profileMsg, setProfileMsg] = useState("");
+
   useEffect(() => {
     if (user) {
       const cap = (user.displayName || "").split(" ").map(w => w ? w.charAt(0).toUpperCase() + w.slice(1) : "").join(" ");
       setName(cap);
+      setNewName(cap);
       setEmail(user.email || "");
-      if (user.photoURL) setProfileSrc(user.photoURL);
+    } else {
+      setName("");
+      setEmail("");
     }
   }, [user]);
+
+  useEffect(() => {
+    setProfileMsg("");
+    setResetMsg("");
+  }, [activeSection]);
 
   useEffect(() => {
     let mounted = true;
     async function loadSaved() {
       if (!uid) {
-        // show localStorage favorites when not logged in
-        const ids = localFavs();
-        setSaved(ids.map(id => ({ id, title: "Saved (offline)", thumbnailUrl: "/images/placeholder.png" })));
-        setSavedTotal(ids.length);
+        setSaved([]);
+        setSavedTotal(0);
         return;
       }
 
@@ -57,17 +63,19 @@ export default function Account() {
         const { total, items } = await listFavorites(uid, savedPage, PAGE_SIZE, savedQuery);
         if (!mounted) return;
         setSavedTotal(total || 0);
-
-        // Map simple entries to display shape (we keep itemId => id)
         const mapped = (items || []).map(it => ({
           id: it.itemId || it.id,
           title: it.title || "Saved item",
-          thumbnailUrl: "/images/placeholder.png"
+          thumbnailUrl: it.thumbnailUrl || "/images/placeholder.png",
+          type: it.type || "article"
         }));
         setSaved(mapped);
       } catch (err) {
         console.error("Failed to load saved items", err);
-        if (mounted) setSaved([]);
+        if (mounted) {
+          setSaved([]);
+          setSavedTotal(0);
+        }
       } finally {
         if (mounted) setLoadingSaved(false);
       }
@@ -76,25 +84,46 @@ export default function Account() {
     return () => { mounted = false; };
   }, [uid, savedPage, savedQuery]);
 
-  async function handleRemoveSaved(itemId) {
-    if (!uid) {
-      // offline local remove
-      const arr = localFavs().filter(x => x !== itemId);
-      try { localStorage.setItem("bh_favorites", JSON.stringify(arr)); } catch (e) {}
-      setSaved(saved.filter(s => s.id !== itemId));
-      setSavedTotal(prev => Math.max(0, prev - 1));
+  async function handleChangeName(e) {
+    e?.preventDefault?.();
+    setProfileMsg("");
+    if (!auth || !auth.updateProfileInfo) {
+      setProfileMsg("Profile update not available.");
       return;
     }
     try {
-      await apiRemoveFavorite(uid, itemId);
-      // refresh list
-      setSavedPage(1);
-      const { total, items } = await listFavorites(uid, 1, PAGE_SIZE, savedQuery);
-      setSavedTotal(total || 0);
-      const mapped = (items || []).map(it => ({ id: it.itemId || it.id, title: it.title || "Saved item", thumbnailUrl: "/images/placeholder.png" }));
-      setSaved(mapped);
+      setChangingName(true);
+      await auth.updateProfileInfo({ displayName: newName });
+      setName(newName);
+      setActiveSection(null);
+      setProfileMsg("Name updated.");
     } catch (err) {
-      console.error("Failed to remove favorite", err);
+      console.error("Failed to update name", err);
+      if (auth?.role === "admin") {
+        setProfileMsg("Failed to update name: " + (err?.message || err));
+      } else {
+        setProfileMsg("Error updating profile. Please try again.");
+      }
+    } finally {
+      setChangingName(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!email) {
+      setResetMsg("No email available");
+      return;
+    }
+    try {
+      const res = await auth.requestPasswordReset(email);
+      setResetMsg("Password reset email sent.");
+    } catch (err) {
+      console.error("Reset email failed", err);
+      if (auth?.role === "admin") {
+        setResetMsg("Reset email failed: " + (err?.message || err));
+      } else {
+        setResetMsg("Failed to send reset email. Please try again.");
+      }
     }
   }
 
@@ -102,11 +131,14 @@ export default function Account() {
     <div>
       <div className="main-content">
         <div className="account-card">
-          <img src={profileSrc} className="account-profile-pic" alt="Profile Picture" />
+          <div style={{ width: "100%", marginBottom: 16 }}>
+            <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Account" }]} />
+          </div>
+
           <div className="account-details">
             <div className="account-name" id="accountName">{name || "—"}</div>
             <div className="account-categories">
-              <span className="account-category-box">{auth?.role ? auth.role : "User"}</span>
+              <span className="account-category-box">{auth?.role ? (auth.role.charAt(0).toUpperCase() + auth.role.slice(1)) : "User"}</span>
             </div>
             <div className="account-email" id="accountEmail">{email || "—"}</div>
           </div>
@@ -114,8 +146,34 @@ export default function Account() {
           <div className="account-actions">
             <button className="account-action-btn" onClick={() => setActiveSection("name")}>Change Name</button>
             <button className="account-action-btn" onClick={() => setActiveSection("password")}>Change Password</button>
-            <button className="account-action-btn" onClick={() => setActiveSection("pic")}>Change Profile Pic</button>
             <button className="account-action-btn" onClick={() => setActiveSection("saved")}>Saved Items</button>
+          </div>
+
+          {/* Success / info messages */}
+          {profileMsg && <div className="account-message" style={{ marginTop: 8 }}>{profileMsg}</div>}
+
+          {/* Change name */}
+          <div className={`account-form-section ${activeSection === "name" ? "active" : ""}`} aria-hidden={activeSection !== "name"}>
+            <form onSubmit={handleChangeName}>
+              <label className="form-label">Full name</label>
+              <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button type="submit" className="account-action-btn" disabled={changingName}>{changingName ? "Saving…" : "Save"}</button>
+                <button type="button" className="see-all-link" onClick={() => { setActiveSection(null); setNewName(name); }}>Cancel</button>
+              </div>
+            </form>
+          </div>
+
+          {/* Reset password */}
+          <div className={`account-form-section ${activeSection === "password" ? "active" : ""}`} aria-hidden={activeSection !== "password"}>
+            <div style={{ marginBottom: 8 }}>
+              <div className="muted">We'll send a password reset link to your email.</div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="account-action-btn" onClick={handleResetPassword}>Send reset email</button>
+              <button className="see-all-link" onClick={() => setActiveSection(null)}>Cancel</button>
+            </div>
+            {resetMsg && <div className="account-message" style={{ marginTop: 8 }}>{resetMsg}</div>}
           </div>
 
           {/* Saved Items */}
@@ -125,6 +183,15 @@ export default function Account() {
               <div style={{ fontSize: 13, color: "rgba(255,255,255,0.75)" }}>Showing your saved content</div>
             </div>
 
+            {!uid && (
+              <div style={{ marginBottom: 12 }}>
+                <div className="muted">You must be signed in to view your saved items.</div>
+                <div style={{ marginTop: 8 }}>
+                  <button className="account-action-btn" onClick={() => navigate("/login")}>Sign in</button>
+                </div>
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
               <input className="text-input" placeholder="Search saved items" value={savedQuery} onChange={(e) => { setSavedQuery(e.target.value); setSavedPage(1); }} />
             </div>
@@ -132,19 +199,18 @@ export default function Account() {
             {loadingSaved ? <div className="muted">Loading…</div> : (
               <>
                 <div className="flex-card-grid" role="list">
-                  {saved.map(s => (
-                    <div key={s.id} style={{ maxWidth: 340 }}>
-                      <Link className="card" to={`/${s.type === "video" ? "video" : s.type === "audio" ? "audio" : s.type === "directory" ? "directory" : "article"}/${s.id}`} role="listitem">
-                        <img className="card-img" src={s.thumbnailUrl || "/images/placeholder.png"} alt={s.title} />
+                  {saved.map(s => {
+                    const dest = `/${s.type === "video" ? "video" : s.type === "audio" ? "audio" : s.type === "directory" ? "directory" : "article"}/${s.id}`;
+                    const imgSrc = s.thumbnailUrl || (s.type === "directory" ? "/images/directoryplaceholder.png" : "/images/placeholder.png");
+                    return (
+                      <Link key={s.id} className="card" to={dest} role="listitem">
+                        <img className="card-img" src={imgSrc} alt={s.title} />
                         <div className="card-content">
                           <div className="card-title">{s.title}</div>
                         </div>
                       </Link>
-                      <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-                        <button className="see-all-link" onClick={() => handleRemoveSaved(s.id)}>Remove</button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
 
                 <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
@@ -156,7 +222,6 @@ export default function Account() {
             )}
           </div>
 
-          {/* other account sections (name/password/pic) are unchanged and omitted here for brevity */}
         </div>
       </div>
     </div>

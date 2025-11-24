@@ -1,5 +1,7 @@
 // src/api/categories.js
 // Firestore helpers for categories (modular v9)
+// Enforce online for writes (create/update/delete)
+
 import {
   collection,
   addDoc,
@@ -23,15 +25,18 @@ export async function listCategories() {
 }
 
 export async function createCategory(name) {
+  if (!navigator.onLine) throw new Error("Online connection required to create categories.");
   return await addDoc(categoriesCol, { name, createdAt: new Date() });
 }
 
 export async function updateCategory(id, name) {
+  if (!navigator.onLine) throw new Error("Online connection required to update categories.");
   const ref = doc(db, "categories", id);
   await updateDoc(ref, { name, updatedAt: new Date() });
 }
 
 export async function deleteCategory(id) {
+  if (!navigator.onLine) throw new Error("Online connection required to delete categories.");
   const ref = doc(db, "categories", id);
   await deleteDoc(ref);
 }
@@ -44,6 +49,7 @@ export async function listSubcategories() {
 }
 
 export async function createSubcategory(name, parentCategory) {
+  if (!navigator.onLine) throw new Error("Online connection required to create subcategories.");
   return await addDoc(subcategoriesCol, { name, parentCategory, createdAt: new Date() });
 }
 

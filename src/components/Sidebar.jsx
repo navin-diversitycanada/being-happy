@@ -46,7 +46,7 @@ export default function Sidebar({ open, onClose }) {
           &times;
         </button>
         <ul>
-          <li><Link to="/" onClick={onClose}>Home</Link></li>
+          <li><Link to="/index" onClick={onClose}>Home</Link></li>
           <li><Link to="/meditation" onClick={onClose}>Meditation</Link></li>
           <li><Link to="/video-library" onClick={onClose}>Video Library</Link></li>
           <li><Link to="/articles" onClick={onClose}>Articles</Link></li>

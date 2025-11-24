@@ -1,27 +1,57 @@
 // src/pages/Directory.jsx
+// Updated: title renders as H1 (no inline margin) and transformContentHeadings adds letter-spacing + margins.
+
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { getPost } from "../api/posts";
 import { listCategories } from "../api/categories";
 import { useAuth } from "../contexts/AuthContext";
 import { addFavorite, removeFavorite, isFavorited } from "../api/favorites";
+import Breadcrumbs from "../components/Breadcrumbs";
 
-/**
- * Directory detail page — shows category names (clickable) and supports persisted favorites.
- */
+function transformContentHeadings(html) {
+  if (!html) return "";
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
 
-function getLocalFavorites() {
-  try { const raw = localStorage.getItem("bh_favorites"); return raw ? JSON.parse(raw) : []; } catch (e) { return []; }
+    const applyStyle = (el, size) => {
+      el.style.fontFamily = "'Lora', serif";
+      el.style.fontWeight = "900";
+      el.style.color = "var(--cream)";
+      el.style.marginTop = "18px";
+      el.style.marginBottom = "12px";
+      el.style.lineHeight = "1.1";
+      el.style.fontSize = size;
+      el.style.letterSpacing = "0.6px";
+    };
+
+    doc.querySelectorAll("h2").forEach(h => applyStyle(h, "28px"));
+    doc.querySelectorAll("h3").forEach(h => applyStyle(h, "24px"));
+    doc.querySelectorAll("hr").forEach(hr => {
+      hr.style.marginTop = "18px";
+      hr.style.marginBottom = "18px";
+      hr.style.border = "none";
+      hr.style.borderTop = "1px solid rgba(255,255,255,0.06)";
+    });
+
+    return doc.body.innerHTML || "";
+  } catch (e) {
+    console.warn("transformContentHeadings failed", e);
+    return html;
+  }
 }
-function setLocalFavorites(arr) { try { localStorage.setItem("bh_favorites", JSON.stringify(arr)); } catch (e) {} }
 
 export default function Directory() {
   const { id } = useParams();
   const auth = useAuth();
+  const navigate = useNavigate();
   const [dir, setDir] = useState(null);
   const [catsMap, setCatsMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [isFav, setIsFav] = useState(false);
+  const [favLoading, setFavLoading] = useState(false);
+  const [favError, setFavError] = useState("");
   const currentUid = auth?.user?.uid || null;
 
   useEffect(() => {
@@ -36,13 +66,9 @@ export default function Directory() {
         (cats || []).forEach(c => { map[c.id] = c.name; });
         setCatsMap(map);
 
-        if (currentUid) {
-          const fav = await isFavorited(currentUid, id).catch(() => false);
-          if (!mounted) return;
-          setIsFav(fav);
-        } else {
-          setIsFav(getLocalFavorites().includes(id));
-        }
+        const fav = await isFavorited(currentUid || null, id).catch(() => false);
+        if (!mounted) return;
+        setIsFav(fav);
       } catch (err) {
         console.error("Failed to load directory item", err);
         if (mounted) setDir(null);
@@ -55,30 +81,34 @@ export default function Directory() {
   }, [id, currentUid]);
 
   async function toggleFavorite() {
+    setFavError("");
     if (!currentUid) {
-      const favs = getLocalFavorites();
-      if (favs.includes(id)) {
-        const next = favs.filter(x => x !== id);
-        setLocalFavorites(next);
-        setIsFav(false);
-      } else {
-        const next = [...favs, id];
-        setLocalFavorites(next);
-        setIsFav(true);
-      }
+      if (window.confirm("You must be signed in to save favorites. Sign in now?")) navigate("/login");
       return;
     }
-
+    if (!navigator.onLine) {
+      setFavError("You must be online to save favorites.");
+      return;
+    }
+    setFavLoading(true);
     try {
+      const imageSrc = dir.imageUrl || dir.thumbnailUrl || null;
       if (isFav) {
         await removeFavorite(currentUid, id);
         setIsFav(false);
       } else {
-        await addFavorite(currentUid, { id, title: dir?.title || null, type: dir?.type || "directory" });
+        await addFavorite(currentUid, { id, title: dir?.title || null, type: dir?.type || "directory", thumbnailUrl: imageSrc });
         setIsFav(true);
       }
     } catch (err) {
       console.error("Failed to toggle favorite", err);
+      if (auth?.role === "admin") {
+        setFavError(`Failed to toggle favorite: ${err?.message || err}`);
+      } else {
+        setFavError("Error saving your favorites. Please try again.");
+      }
+    } finally {
+      setFavLoading(false);
     }
   }
 
@@ -105,26 +135,33 @@ export default function Directory() {
   }
 
   const visitUrl = (dir.extra && (dir.extra.directoryLink || dir.extra.link)) || dir.link || null;
+  const imageSrc = dir.imageUrl || dir.thumbnailUrl || "/images/directoryplaceholder.png";
+  const contentHtml = transformContentHeadings(dir.content || dir.excerpt || dir.desc || "");
 
   return (
     <div className="main-content">
       <div className="detail-card">
-        <div className="detail-title">{dir.title}</div>
+        <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Directories", to: "/directories" }, { label: dir.title }]} />
+        <img className="detail-img" style={{ maxWidth: 300 }} src={imageSrc} alt={dir.title} />
+        <h1 className="detail-title">{dir.title}</h1>
 
         <div className="detail-categories">
           {(dir.categories || []).map(cid => (
-            <Link key={cid} to={`/category/${cid}`} className="detail-category-box">{catsMap[cid] || cid}</Link>
+            <Link key={cid} to={`/category/${cid}`} className="detail-category-box" style={{ textDecoration: "none" }}>{catsMap[cid] || cid}</Link>
           ))}
         </div>
 
         <div style={{ marginTop: 12, marginBottom: 14 }}>
-          <button className="account-action-btn" onClick={toggleFavorite} aria-pressed={isFav}>{isFav ? "Remove from Favorites" : "Add to Favorites"}</button>
+          <button className="account-action-btn" onClick={toggleFavorite} aria-pressed={isFav} disabled={favLoading}>
+            {favLoading ? "…" : (isFav ? "Remove from Favorites" : "Add to Favorites")}
+          </button>
           {visitUrl && <a className="account-action-btn" href={visitUrl} target="_blank" rel="noreferrer" style={{ marginLeft: 8 }}>Visit</a>}
         </div>
 
-        <div className="detail-description"><strong>Description:</strong> <div dangerouslySetInnerHTML={{ __html: dir.content || dir.excerpt || dir.desc || "" }} /></div>
+        {favError && <div className="account-message" style={{ marginTop: 8 }}>{favError}</div>}
 
-        {/* Only render contact section if contact info exists */}
+        <div className="detail-description"><strong>Description:</strong> <div dangerouslySetInnerHTML={{ __html: contentHtml }} /></div>
+
         {(dir.extra && (dir.extra.phone || dir.extra.contact)) && (
           <div className="detail-description"><strong>Contact:</strong> {dir.extra?.phone || dir.extra?.contact}</div>
         )}

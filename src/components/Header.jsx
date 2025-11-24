@@ -16,16 +16,13 @@ export default function Header({ onMenuClick }) {
 
   function handleLogoClick(e) {
     e.preventDefault();
-    if (user) {
-      navigate("/Index".toLowerCase()); // go to /index for authenticated users
-    } else {
-      navigate("/");
-    }
+    // Always navigate to /index (home)
+    navigate("/index", { replace: true });
   }
 
   return (
     <nav className="navbar" role="banner">
-      <a href={user ? "/index" : "/"} className="navbar-logo" onClick={handleLogoClick}>
+       <a href="/index" className="navbar-logo" onClick={handleLogoClick}>
         Being Happy
       </a>
       <div className="navbar-actions">

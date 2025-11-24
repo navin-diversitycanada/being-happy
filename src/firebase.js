@@ -1,10 +1,9 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, OAuthProvider } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, FacebookAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getFunctions } from "firebase/functions";
 
-
-
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyB833LIkA3T7HQ3I7xf7R6d1sao3PQrNqA",
   authDomain: "being-happy-pwa.firebaseapp.com",
   projectId: "being-happy-pwa",
@@ -18,6 +17,9 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 
+// Export functions client so AdminPanel can call the setUserRole callable function
+export const functions = getFunctions(app);
+
+// Providers exported for reuse
 export const googleProvider = new GoogleAuthProvider();
-// Apple provider
-export const appleProvider = new OAuthProvider('apple.com');
+export const facebookProvider = new FacebookAuthProvider();

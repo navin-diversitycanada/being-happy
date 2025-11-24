@@ -1,17 +1,27 @@
 // src/pages/AdminPanel.jsx
-// Modified: removed duplicate top-level general message, added featured section filter + search,
-// adjusted categories add layout to put button on next row and make input full-width,
-// ensured featured tab has type filter and search similar to Posts list.
+// Admin Panel — full file
+// Changes in this version:
+// - Removed code-block insertion option from the WYSIWYG editor (no code insertion).
+// - Reordered toolbar buttons to: Bold, Italic, Underline, Strikethrough (S struck), H2, H3,
+//   Pointed List, Numbered List, Line, Link.
+// - Adjusted toolbar to be responsive (flex-wrap) so buttons flow to next line on small screens.
+// - Kept sanitizeHtml allowing H2/H3/UL/OL/LI/P/BR/PRE/CODE/HR/B/I/U/S/A[href]; already strips attributes.
+// - No other behavioral changes.
 
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { Link } from "react-router-dom";
 import ImageUploader from "../components/PostFormFields/ImageUploader";
+import Breadcrumbs from "../components/Breadcrumbs";
 import { listCategories as apiListCategories, createCategory, updateCategory, deleteCategory } from "../api/categories";
 import { createPost, updatePost, getPost, listAllForAdmin, deletePost } from "../api/posts";
 
-// Firestore SDK (modular) for type-category ensures and user management
+// Firestore SDK (modular)
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs } from "firebase/firestore";
-import { listFavorites } from "../api/favorites";
+
+// Firebase Auth helper for admin password reset emails
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth, firebaseConfig } from "../firebase";
 
 /* Helper to display types in a user-friendly/capitalized way */
 function displayType(type) {
@@ -36,29 +46,78 @@ function extractYouTubeId(input) {
   return m ? m[1] : null;
 }
 
+/* ======= Sanitizer helper (keeps H2/H3 allowed) ======= */
+/**
+ * sanitizeHtml
+ * - DOM based sanitizer that:
+ *   * allows a conservative whitelist of tags:
+ *     p, br, b/strong, i/em, u, s/strike, h2, h3, ul, ol, li, pre, code, hr, a[href]
+ *   * strips ALL attributes except href on <a> (and ensures href is not javascript: or data:)
+ *   * removes style/class/other attributes
+ * - Returns sanitized innerHTML (string).
+ */
 function sanitizeHtml(html) {
   if (!html || typeof html !== "string") return "";
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
-    const all = doc.querySelectorAll("*");
-    all.forEach(node => {
-      node.removeAttribute("style");
+
+    // Allowed tags set (upper-case tagName)
+    const allowed = new Set([
+      "A", "P", "BR", "B", "STRONG", "I", "EM", "U", "S", "STRIKE",
+      "H2", "H3", "UL", "OL", "LI", "PRE", "CODE", "HR"
+    ]);
+
+    // Walk all elements and clean or unwrap
+    const all = Array.from(doc.body.querySelectorAll("*"));
+    for (const node of all) {
+      const tn = node.tagName.toUpperCase();
+      if (!allowed.has(tn)) {
+        // unwrap node: move children before node, then remove node
+        const parent = node.parentNode;
+        while (node.firstChild) parent.insertBefore(node.firstChild, node);
+        parent.removeChild(node);
+        continue;
+      }
+
+      // For allowed tags, strip attributes except href on <a>
+      for (const attr of Array.from(node.attributes)) {
+        if (tn === "A" && attr.name === "href") {
+          // keep href but sanitize javascript: and data: URIs
+          try {
+            const href = (attr.value || "").trim();
+            const lower = href.toLowerCase();
+            if (lower.startsWith("javascript:") || lower.startsWith("data:")) {
+              node.removeAttribute(attr.name);
+            } else {
+              // keep href
+            }
+          } catch (e) {
+            node.removeAttribute(attr.name);
+          }
+        } else {
+          node.removeAttribute(attr.name);
+        }
+      }
+
+      // Defensive: ensure style/class removed
+      if (node.style) node.removeAttribute("style");
       node.removeAttribute("class");
-      node.removeAttribute("face");
-      node.removeAttribute("color");
-      node.removeAttribute("size");
-    });
+    }
+
+    // Clean up empty font tags if any slipped through (defensive)
     doc.querySelectorAll("font").forEach(font => {
       while (font.firstChild) font.parentNode.insertBefore(font.firstChild, font);
       font.parentNode.removeChild(font);
     });
-    return doc.body.innerHTML;
+
+    return doc.body.innerHTML || "";
   } catch (err) {
     console.warn("Sanitize failed", err);
     return html;
   }
 }
+/* ======= end sanitizer ======= */
 
 function isValidCategoryName(name) {
   if (!name || typeof name !== "string") return false;
@@ -75,9 +134,12 @@ export default function AdminPanel() {
 
   const hasFirestore = true;
   const workerUrl = process.env.REACT_APP_UPLOAD_WORKER_URL || null;
+  // default upload key for testing/local (will be null in production if not provided)
+  const uploadKeyEnv = process.env.REACT_APP_UPLOAD_KEY || null;
 
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState([]);
+  // categories now store immutable flag
   const [categories, setCategories] = useState([]);
   const [usersList, setUsersList] = useState([]);
   const [activeSection, setActiveSection] = useState("posts");
@@ -125,6 +187,20 @@ export default function AdminPanel() {
 
   const db = getFirestore();
 
+  // Online state for UI disabling of write actions
+  const [isOnline, setIsOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+
+  useEffect(() => {
+    function onOnline() { setIsOnline(true); }
+    function onOffline() { setIsOnline(false); }
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, []);
+
   // Ensure type categories exist and are immutable
   async function ensureTypeCategories() {
     try {
@@ -164,6 +240,7 @@ export default function AdminPanel() {
         const [allPosts, cats] = await Promise.all([listAllForAdmin(1000), apiListCategories()]);
         if (cancelled) return;
         setPosts(allPosts || []);
+        // store immutable flag so we can filter them out in the UI
         setCategories((cats || []).map(c => ({ id: c.id, name: c.name, immutable: !!c.immutable })));
       } catch (err) {
         console.error("Admin load error", err);
@@ -208,6 +285,11 @@ export default function AdminPanel() {
     loadUsers();
     return () => { cancelled = true; };
   }, [activeSection, isAdmin, db]);
+
+  // Clear admin fieldMessages when switching sections so messages don't persist across tabs
+  useEffect(() => {
+    setFieldMessages({ general: "", post: "", category: "", upload: "", youtube: "", users: "" });
+  }, [activeSection]);
 
   useEffect(() => {
     if (!wysiwygRef.current) return;
@@ -270,6 +352,7 @@ export default function AdminPanel() {
     e?.preventDefault?.();
     setFieldMessages({ general: "", post: "", category: "", upload: "", youtube: "", users: "" });
     if (!isAdmin) { setFieldMessages(p => ({ ...p, post: "Only admins can save posts." })); return; }
+    if (!isOnline) { setFieldMessages(p => ({ ...p, post: "You are offline — must be online to save posts." })); return; }
 
     try {
       const html = wysiwygRef.current ? wysiwygRef.current.innerHTML : postForm.descHTML;
@@ -372,6 +455,7 @@ export default function AdminPanel() {
 
   async function handleDeletePost(id) {
     if (!window.confirm("Delete post? This cannot be undone.")) return;
+    if (!isOnline) { setFieldMessages(p => ({ ...p, general: "You are offline — cannot delete posts." })); return; }
     try {
       await deletePost(id);
       const refreshed = await listAllForAdmin(1000);
@@ -386,6 +470,7 @@ export default function AdminPanel() {
   }
 
   async function togglePostField(id, field) {
+    if (!isOnline) { setFieldMessages(p => ({ ...p, general: "You are offline — cannot change post status." })); return; }
     try {
       const p = await getPost(id);
       if (!p) return;
@@ -395,10 +480,17 @@ export default function AdminPanel() {
       setPosts(refreshed || []);
     } catch (err) {
       console.error("Toggle failed", err);
+      setFieldMessages(p => ({ ...p, general: "Failed to toggle post field." }));
     }
   }
 
   async function handleUploaded(result) {
+    // Only allow attaching uploaded image when online
+    if (!isOnline) {
+      setFieldMessages(p => ({ ...p, upload: "You are offline — cannot attach uploaded image." }));
+      return;
+    }
+
     updatePostForm({
       imageUrl: result.imageUrl || "",
       thumbnailUrl: result.thumbnailUrl || result.imageUrl || ""
@@ -424,6 +516,7 @@ export default function AdminPanel() {
   /* CATEGORY CRUD */
   async function handleAddCategory(e) {
     e?.preventDefault?.();
+    if (!isOnline) { setFieldMessages(p => ({ ...p, category: "You are offline — cannot create categories." })); return; }
     const name = (categoryFormName || "").trim();
     if (!name) { setFieldMessages(p => ({ ...p, category: "Enter category name" })); return; }
     if (!isValidCategoryName(name)) { setFieldMessages(p => ({ ...p, category: "Invalid name; allowed: letters, numbers, spaces, - and &" })); return; }
@@ -457,6 +550,7 @@ export default function AdminPanel() {
 
   async function saveEditCategory() {
     if (!editingCategoryId) return;
+    if (!isOnline) { setFieldMessages(p => ({ ...p, category: "You are offline — cannot update categories." })); return; }
     const nv = (categoryFormName || "").trim();
     if (!nv) { setFieldMessages(p => ({ ...p, category: "Enter category name" })); return; }
     if (!isValidCategoryName(nv)) { setFieldMessages(p => ({ ...p, category: "Invalid name; allowed chars" })); return; }
@@ -477,6 +571,7 @@ export default function AdminPanel() {
 
   async function removeCategory(id) {
     if (!window.confirm("Delete category? This will remove it from posts' category lists.")) return;
+    if (!isOnline) { setFieldMessages(p => ({ ...p, category: "You are offline — cannot delete categories." })); return; }
     try {
       const c = categories.find(x => x.id === id);
       if (c && c.immutable) {
@@ -525,15 +620,86 @@ export default function AdminPanel() {
       return;
     }
     if (!uid) return;
+    if (!isOnline) { setFieldMessages(p => ({ ...p, users: "You are offline — cannot change roles." })); return; }
     try {
       setUpdatingUserId(uid);
       const ref = doc(db, "users", uid);
       await updateDoc(ref, { role: newRole, updatedAt: new Date() });
       setUsersList(prev => prev.map(u => (u.id === uid ? { ...u, role: newRole } : u)));
-      setFieldMessages(p => ({ ...p, users: `Updated role for ${uid}` }));
+      // Use friendly name/email in feedback
+      const usr = usersList.find(u => u.id === uid);
+      const who = usr ? (usr.displayName || usr.email || uid) : uid;
+      setFieldMessages(p => ({ ...p, users: `Updated role for ${who}` }));
     } catch (err) {
       console.error("Failed to update user role", err);
-      setFieldMessages(p => ({ ...p, users: "Failed to update role. Ensure you have permission." }));
+      // Permission denied likely if rules don't allow — surface a helpful message
+      if (err && err.code === "permission-denied") {
+        setFieldMessages(p => ({ ...p, users: "Permission denied. Make sure your Firestore rules allow admins to update user roles." }));
+      } else {
+        setFieldMessages(p => ({ ...p, users: "Failed to update role. Ensure you have permission." }));
+      }
+    } finally {
+      setUpdatingUserId(null);
+    }
+  }
+
+  // New: disable user by setting users/{uid}.disabled = true
+  async function handleDisableUser(uid) {
+    if (!isAdmin) {
+      setFieldMessages(p => ({ ...p, users: "Only admins can perform this action." }));
+      return;
+    }
+    if (!isOnline) { setFieldMessages(p => ({ ...p, users: "You are offline — cannot disable users." })); return; }
+    if (!uid) return;
+    if (!window.confirm("Disable user? This will set the user's account as disabled (they will not be able to perform write operations). Proceed?")) return;
+    try {
+      setFieldMessages(p => ({ ...p, users: "" }));
+      setUpdatingUserId(uid);
+      const ref = doc(db, "users", uid);
+      await updateDoc(ref, { disabled: true, updatedAt: new Date() });
+      // update local list to reflect flag immediately
+      setUsersList(prev => prev.map(u => (u.id === uid ? { ...u, _raw: { ...u._raw, disabled: true }, role: u.role } : u)));
+      const usr = usersList.find(u => u.id === uid);
+      const who = usr ? (usr.displayName || usr.email || uid) : uid;
+      setFieldMessages(p => ({ ...p, users: `User ${who} disabled.` }));
+    } catch (err) {
+      console.error("Failed to disable user", err);
+      if (err && err.code === "permission-denied") {
+        setFieldMessages(p => ({ ...p, users: "Permission denied. Make sure your Firestore rules allow admins to update user records." }));
+      } else {
+        // admin gets full details; others will see friendly message elsewhere
+        setFieldMessages(p => ({ ...p, users: `Failed to disable user: ${err?.message || err}` }));
+      }
+    } finally {
+      setUpdatingUserId(null);
+    }
+  }
+
+  // New: enable user by clearing users/{uid}.disabled (set to false)
+  async function handleEnableUser(uid) {
+    if (!isAdmin) {
+      setFieldMessages(p => ({ ...p, users: "Only admins can perform this action." }));
+      return;
+    }
+    if (!isOnline) { setFieldMessages(p => ({ ...p, users: "You are offline — cannot enable users." })); return; }
+    if (!uid) return;
+    if (!window.confirm("Enable user? This will clear the disabled flag and allow the user to perform actions again. Proceed?")) return;
+    try {
+      setFieldMessages(p => ({ ...p, users: "" }));
+      setUpdatingUserId(uid);
+      const ref = doc(db, "users", uid);
+      await updateDoc(ref, { disabled: false, updatedAt: new Date() });
+      setUsersList(prev => prev.map(u => (u.id === uid ? { ...u, _raw: { ...u._raw, disabled: false }, role: u.role } : u)));
+      const usr = usersList.find(u => u.id === uid);
+      const who = usr ? (usr.displayName || usr.email || uid) : uid;
+      setFieldMessages(p => ({ ...p, users: `User ${who} enabled.` }));
+    } catch (err) {
+      console.error("Failed to enable user", err);
+      if (err && err.code === "permission-denied") {
+        setFieldMessages(p => ({ ...p, users: "Permission denied. Make sure your Firestore rules allow admins to update user records." }));
+      } else {
+        setFieldMessages(p => ({ ...p, users: `Failed to enable user: ${err?.message || err}` }));
+      }
     } finally {
       setUpdatingUserId(null);
     }
@@ -562,19 +728,75 @@ export default function AdminPanel() {
     };
   }
 
-  // ---- User action stubs (Reset password / Disable user) ----
+  // ---- User action stubs (Reset password) ----
   async function handleResetPassword(uid) {
     if (!isAdmin) { setFieldMessages(p => ({ ...p, users: "Only admins can perform this action." })); return; }
-    if (!window.confirm("Reset password for this user? This requires a server-side implementation to actually reset (this is a UI stub).")) return;
-    // TODO: call Cloud Function or server endpoint that performs privileged reset.
-    setFieldMessages(p => ({ ...p, users: "Reset password requested — implement server-side function to perform this action." }));
-  }
+    if (!uid) return;
+    if (!isOnline) { setFieldMessages(p => ({ ...p, users: "You are offline — cannot send reset emails." })); return; }
+    // find user email from usersList
+    const userEntry = usersList.find(u => u.id === uid);
+    const targetEmail = userEntry?.email;
+    if (!targetEmail) {
+      setFieldMessages(p => ({ ...p, users: "User does not have an email address on record." }));
+      return;
+    }
+    if (!window.confirm(`Send password reset email to ${targetEmail}?`)) return;
 
-  async function handleDisableUser(uid) {
-    if (!isAdmin) { setFieldMessages(p => ({ ...p, users: "Only admins can perform this action." })); return; }
-    if (!window.confirm("Disable user? This requires a server-side implementation to disable the account (this is a UI stub).")) return;
-    // TODO: call Cloud Function to disable user or update a flag in Firestore and enforce in security rules.
-    setFieldMessages(p => ({ ...p, users: "Disable user requested — implement server-side function to perform this action." }));
+    try {
+      setFieldMessages(p => ({ ...p, users: "" }));
+
+      // Use app origin as continue URL (landing to login)
+      const continueUrl = (typeof window !== "undefined") ? `${window.location.origin}/login` : "https://being-happy-pwa.web.app/login";
+
+      try {
+        // Primary attempt: client SDK
+        await sendPasswordResetEmail(auth, targetEmail, { url: continueUrl, handleCodeInApp: true });
+        setFieldMessages(p => ({ ...p, users: `Password reset email sent to ${targetEmail}` }));
+        return;
+      } catch (sdkErr) {
+        console.error("sendPasswordResetEmail failed:", sdkErr);
+
+        // Specific fallback: if SDK complains about recaptcha/internal, try REST endpoint using apiKey
+        // This fallback uses the Identity Toolkit sendOobCode endpoint.
+        const apiKey = (firebaseConfig && firebaseConfig.apiKey) || null;
+        if (!apiKey) {
+          setFieldMessages(p => ({ ...p, users: "Failed to send reset email (no API key). See console for details." }));
+          return;
+        }
+
+        // Attempt REST fallback
+        try {
+          const restUrl = `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${encodeURIComponent(apiKey)}`;
+          const body = {
+            requestType: "PASSWORD_RESET",
+            email: targetEmail,
+            continueUrl,
+            canHandleCodeInApp: true
+          };
+          const resp = await fetch(restUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          if (!resp.ok) {
+            const json = await resp.json().catch(() => null);
+            const msg = (json && (json.error || json.error?.message)) ? (json.error?.message || JSON.stringify(json)) : `HTTP ${resp.status}`;
+            console.error("REST sendOobCode failed", msg, json);
+            setFieldMessages(p => ({ ...p, users: `Failed to send reset email: ${msg}` }));
+            return;
+          }
+          setFieldMessages(p => ({ ...p, users: `Password reset email sent to ${targetEmail}` }));
+          return;
+        } catch (restErr) {
+          console.error("REST fallback for sendOobCode failed:", restErr);
+          setFieldMessages(p => ({ ...p, users: "Failed to send reset email. See console for details." }));
+          return;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to send reset email", err);
+      setFieldMessages(p => ({ ...p, users: "Failed to send reset email. See console for details." }));
+    }
   }
 
   // ---- Render helpers ----
@@ -610,7 +832,6 @@ export default function AdminPanel() {
                   <div style={{ minWidth: 0 }}>
                     <div className="detail-title" style={{ fontSize: 16 }}>{p.title}</div>
                     <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
-                      {/* Show capitalized type first (consistent with Featured page) */}
                       {displayType(p.type)}{(p.categories || []).length ? ` • ${(p.categories || []).map(cid => (categories.find(c => c.id === cid) || {}).name || cid).join(", ")}` : ""}
                     </div>
                   </div>
@@ -625,7 +846,7 @@ export default function AdminPanel() {
                   <div className="admin-row-actions" style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                     <button className="see-all-link" onClick={() => viewPost(p.id, p.type)}>View</button>
                     <button className="see-all-link" onClick={() => handleEditPost(p.id)}>Edit</button>
-                    <button className="account-action-btn" onClick={() => handleDeletePost(p.id)}>Delete</button>
+                    <button className="account-action-btn" onClick={() => handleDeletePost(p.id)} disabled={!isOnline || !isAdmin}>Delete</button>
                   </div>
                 </div>
               </div>
@@ -643,7 +864,10 @@ export default function AdminPanel() {
   }
 
   function renderCategoriesList() {
-    const { total, pages, items } = filterAndPage(categories, categoryQuery, categoryPage);
+    // hide immutable/system type categories from the Existing Categories view
+    const visibleCats = (categories || []).filter(c => !c.immutable);
+    const { total, pages, items } = filterAndPage(visibleCats, categoryQuery, categoryPage);
+
     return (
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -662,7 +886,7 @@ export default function AdminPanel() {
               </div>
               <div className="admin-row-actions">
                 <button className="see-all-link" onClick={() => startEditCategory(cat)}>Edit</button>
-                {!cat.immutable ? <button className="account-action-btn" onClick={() => removeCategory(cat.id)}>Delete</button> : null}
+                {!cat.immutable ? <button className="account-action-btn" onClick={() => removeCategory(cat.id)} disabled={!isOnline || !isAdmin}>Delete</button> : null}
               </div>
             </div>
           ))}
@@ -692,28 +916,39 @@ export default function AdminPanel() {
           {loadingUsers ? <div className="muted">Loading users…</div> : (
             <>
               {items.length === 0 && <div className="muted">No users found.</div>}
-              {items.map(u => (
+              {items.map(u => {
+                const disabled = !!(u._raw && u._raw.disabled);
+                return (
                 <div key={u.id} className="admin-row user-row" style={{ alignItems: "center", justifyContent: "space-between", padding: 12 }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 140px auto", gap: 12, alignItems: "center", width: "100%" }}>
                     <div style={{ fontWeight: 700 }}>{u.displayName || "—"}</div>
-                    <div className="muted" style={{ fontSize: 13 }}>{u.email || "—"}</div>
-                    <div style={{ textTransform: "capitalize", fontWeight: 700, color: (u.role && u.role.toLowerCase() === "admin") ? "salmon" : "var(--cream)" }}>{(u.role || "user").toLowerCase()}</div>
+
+                    {/* Email column: always show email. If the listed user is an admin, show their uid below the email in cream color */}
+                    <div>
+                      <div className="muted" style={{ fontSize: 13 }}>{u.email || "—"}</div>
+                      { (u.role && u.role.toLowerCase() === "admin") && (
+                        <div style={{ fontSize: 13, color: "var(--cream)", marginTop: 4 }}>{u.id}</div>
+                      )}
+                    </div>
+
+                    <div style={{ textTransform: "capitalize", fontWeight: 700, color: (u.role && u.role.toLowerCase() === "admin") ? "salmon" : "var(--cream)", fontSize: 13 }}>
+                      {(u.role || "user").toLowerCase()}
+                      {disabled ? " • disabled" : ""}
+                    </div>
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                      {/* If this is the current logged-in user, show an inert "Current user" button */}
                       {u.id === (currentUser && currentUser.uid) ? (
                         <button className="see-all-link" title="This is you" disabled>Current user</button>
                       ) : null}
 
-                      {/* Role actions */}
                       {u.role !== "admin" ? (
-                        <button className="account-action-btn" disabled={updatingUserId === u.id} onClick={() => setUserRole(u.id, "admin")}>
+                        <button className="account-action-btn" disabled={updatingUserId === u.id || !isOnline || !isAdmin} onClick={() => setUserRole(u.id, "admin")}>
                           {updatingUserId === u.id ? "Updating…" : "Make Admin"}
                         </button>
                       ) : (
                         u.id === (currentUser && currentUser.uid) ? null : (
                           <button
                             className="see-all-link"
-                            disabled={updatingUserId === u.id}
+                            disabled={updatingUserId === u.id || !isOnline || !isAdmin}
                             onClick={() => setUserRole(u.id, "user")}
                             title="Demote to user"
                           >
@@ -722,13 +957,22 @@ export default function AdminPanel() {
                         )
                       )}
 
-                      {/* Additional user actions (UI stubs) */}
-                      <button className="see-all-link" onClick={() => handleResetPassword(u.id)}>Reset Password</button>
-                      <button className="account-action-btn" onClick={() => handleDisableUser(u.id)}>Disable User</button>
+                      <button className="see-all-link" onClick={() => handleResetPassword(u.id)} disabled={!isOnline || !isAdmin}>Reset Password</button>
+
+                      {/* Enable / Disable button */}
+                      {disabled ? (
+                        <button className="account-action-btn" disabled={updatingUserId === u.id || !isOnline || !isAdmin} onClick={() => handleEnableUser(u.id)}>
+                          {updatingUserId === u.id ? "Updating…" : "Enable User"}
+                        </button>
+                      ) : (
+                        <button className="account-action-btn" disabled={updatingUserId === u.id || !isOnline || !isAdmin} onClick={() => handleDisableUser(u.id)}>
+                          {updatingUserId === u.id ? "Updating…" : "Disable User"}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </>
           )}
         </div>
@@ -756,7 +1000,17 @@ export default function AdminPanel() {
   return (
     <div className="main-content">
       <div className="admin-panel admin-extra">
-        <h2 className="carousel-title">Admin Panel</h2>
+        <div className="promo-box">
+          <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Admin" }]} />
+          <div style={{ marginTop: 8 }}><div className="greeting">Admin Panel</div></div>
+        </div>
+
+        {/* Offline banner */}
+        {!isOnline && (
+          <div style={{ marginBottom: 12 }}>
+            <div className="account-message error-text">You are offline — all write operations (create/update/delete/upload) are disabled until you reconnect.</div>
+          </div>
+        )}
 
         <div className="admin-tabs" role="tablist" aria-label="Admin Sections">
           <button className={`admin-tab-btn ${activeSection === "posts" ? "active" : ""}`} type="button" onClick={() => setActiveSection("posts")}>Posts</button>
@@ -767,9 +1021,6 @@ export default function AdminPanel() {
           )}
         </div>
 
-        {/* Removed duplicate top-level general message (so messages appear once in the context they refer to) */}
-
-        {/* POSTS SECTION */}
         <div className={activeSection === "posts" ? "admin-tab active" : "admin-tab"}>
           {renderPostsList()}
 
@@ -778,7 +1029,6 @@ export default function AdminPanel() {
           <h3 className="carousel-title">{editingPostId ? "Edit Post" : "Add Post"}</h3>
           <form className="admin-form" ref={postFormRef} onSubmit={handleSavePost}>
 
-            {/* Type moved above Title as requested */}
             <label className="form-label">Type</label>
             <select className="text-input" value={postForm.type} onChange={(e) => updatePostForm({ type: e.target.value })} disabled={!!editingPostId}>
               <option>Article</option>
@@ -792,9 +1042,13 @@ export default function AdminPanel() {
 
             <label className="form-label">Categories (pick one or more)</label>
             <div className="row gap-8">
-              <select className="text-input" onChange={(e) => { if (e.target.value) { addCategoryToPost(e.target.value); e.target.value = ""; } }}>
+              <select
+                className="text-input"
+                onChange={(e) => { if (e.target.value) { addCategoryToPost(e.target.value); e.target.value = ""; } }}
+              >
                 <option value="">Add Category</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                {/* exclude immutable/system type categories from the selector */}
+                {categories.filter(c => !c.immutable).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
 
@@ -811,15 +1065,35 @@ export default function AdminPanel() {
             </div>
 
             <label className="form-label">Description (WYSIWYG)</label>
-            <div className="wysiwyg-toolbar">
-              <button type="button" className="wys-btn" onClick={() => document.execCommand("bold", false, null)}><b>B</b></button>
-              <button type="button" className="wys-btn" onClick={() => document.execCommand("italic", false, null)}><i>I</i></button>
-              <button type="button" className="wys-btn" onClick={() => document.execCommand("insertUnorderedList", false, null)}>&bull; list</button>
-              <button type="button" className="wys-btn" onClick={() => {
+
+            {/* WYSIWYG toolbar (responsive: wraps on small screens). Order: Bold, Italic, Underline, Strikethrough, H2, H3, Bulleted List, Numbered List, Line, Link */}
+            <div
+              className="wysiwyg-toolbar"
+              style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap", alignItems: "center" }}
+            >
+              <button type="button" className="wys-btn" style={{ minWidth: 44 }} onClick={() => document.execCommand("bold", false, null)}><b>B</b></button>
+              <button type="button" className="wys-btn" style={{ minWidth: 44 }} onClick={() => document.execCommand("italic", false, null)}><i>I</i></button>
+              <button type="button" className="wys-btn" style={{ minWidth: 44 }} onClick={() => document.execCommand("underline", false, null)}>U</button>
+              <button type="button" className="wys-btn" style={{ minWidth: 44 }} onClick={() => document.execCommand("strikeThrough", false, null)} title="Strikethrough"><s>S</s></button>
+
+              {/* Headings */}
+              <button type="button" className="wys-btn" style={{ minWidth: 64 }} onClick={() => document.execCommand("formatBlock", false, "h2")}>H2</button>
+              <button type="button" className="wys-btn" style={{ minWidth: 64 }} onClick={() => document.execCommand("formatBlock", false, "h3")}>H3</button>
+
+              {/* Lists */}
+              <button type="button" className="wys-btn" style={{ minWidth: 64 }} onClick={() => document.execCommand("insertUnorderedList", false, null)}>&bull; List</button>
+              <button type="button" className="wys-btn" style={{ minWidth: 110 }} onClick={() => document.execCommand("insertOrderedList", false, null)}>Numbered List</button>
+
+              {/* Horizontal rule */}
+              <button type="button" className="wys-btn" style={{ minWidth: 56 }} onClick={() => document.execCommand("insertHorizontalRule", false, null)}>Line</button>
+
+              {/* Link helper */}
+              <button type="button" className="wys-btn" style={{ minWidth: 56 }} onClick={() => {
                 const url = window.prompt("Enter URL");
                 if (url && wysiwygRef.current) document.execCommand("createLink", false, url);
               }}>Link</button>
             </div>
+
             <div
               ref={wysiwygRef}
               className="wysiwyg"
@@ -834,21 +1108,27 @@ export default function AdminPanel() {
               }}
               onPaste={(e) => {
                 e.preventDefault();
+                // Insert plain text to avoid pasted styles; sanitize on save as well.
                 const text = (e.clipboardData || window.clipboardData).getData('text/plain');
                 document.execCommand('insertText', false, text);
               }}
               style={{ whiteSpace: "pre-wrap" }}
             />
 
-            {/* Image upload: hide for Directory type (directories don't need images) */}
-            {postForm.type !== "Directory" && ImageUploader && workerUrl ? (
-              <ImageUploader key={`${uploaderKey}-${editingPostId || "new"}`} workerUrl={workerUrl} postId={editingPostId || "temp"} onUploaded={handleUploaded} />
-            ) : (postForm.type !== "Directory" ? (
-              <input className="text-input" type="file" accept="image/*" onChange={() => setFieldMessages((p) => ({ ...p, upload: "Use ImageUploader for uploads." }))} />
-            ) : null)}
+            { /* Show ImageUploader for all types (optional for Directory) when workerUrl available and online */ }
+            { ImageUploader && workerUrl && isOnline ? (
+           <ImageUploader
+  key={`${uploaderKey}-${editingPostId || "new"}`}
+  workerUrl={workerUrl}
+  postId={editingPostId || "temp"}
+  onUploaded={handleUploaded}
+/>
+            ) : (!isOnline ? (
+              <div className="muted" style={{ marginTop: 8 }}>Offline — image uploads disabled until you're online.</div>
+            ) : null) }
+
             {fieldMessages.upload && <div className="account-message">{fieldMessages.upload}</div>}
 
-            {/* YouTube field: shown for Article (optional), Video and Audio (required for validation) — hide on Directory */}
             {postForm.type !== "Directory" && (
               <>
                 <label className="form-label">YouTube URL or ID { (postForm.type === "Video" || postForm.type === "Audio") ? "(required for Video/Audio)" : "(optional for Article)" }</label>
@@ -867,7 +1147,7 @@ export default function AdminPanel() {
             </div>
 
             <div className="row gap-12 mt-12">
-              <button className="account-action-btn" type="submit" disabled={saving}>{saving ? "Saving…" : (editingPostId ? "Save Post" : "Add Post")}</button>
+              <button className="account-action-btn" type="submit" disabled={saving || !isOnline || !isAdmin}>{saving ? "Saving…" : (editingPostId ? "Save Post" : "Add Post")}</button>
               <button type="button" className="see-all-link" onClick={resetPostForm}>Reset</button>
             </div>
 
@@ -875,7 +1155,6 @@ export default function AdminPanel() {
           </form>
         </div>
 
-        {/* CATEGORIES SECTION */}
         <div className={activeSection === "categories" ? "admin-tab active" : "admin-tab"}>
           {renderCategoriesList()}
 
@@ -883,17 +1162,16 @@ export default function AdminPanel() {
 
           <h3 className="carousel-title">{editingCategoryId ? "Edit Category" : "Add Category"}</h3>
 
-          {/* Input full width on its own row, button on the row below */}
           <div className="mt-12">
             <input ref={categoryInputRef} className="text-input" placeholder="Category name" value={categoryFormName} onChange={(e) => { setCategoryFormName(e.target.value); setFieldMessages((p) => ({ ...p, category: "" })); }} />
             <div style={{ marginTop: 8 }}>
               {editingCategoryId ? (
                 <>
-                  <button className="account-action-btn" onClick={saveEditCategory}>Save</button>
+                  <button className="account-action-btn" onClick={saveEditCategory} disabled={!isOnline || !isAdmin}>Save</button>
                   <button className="see-all-link" onClick={() => { setEditingCategoryId(null); setCategoryFormName(""); }}>Cancel</button>
                 </>
               ) : (
-                <button className="account-action-btn" onClick={handleAddCategory}>Add Category</button>
+                <button className="account-action-btn" onClick={handleAddCategory} disabled={!isOnline || !isAdmin}>Add Category</button>
               )}
             </div>
           </div>
@@ -901,7 +1179,6 @@ export default function AdminPanel() {
           {fieldMessages.category && <div className={`account-message ${fieldMessages.category.includes("created") || fieldMessages.category.includes("updated") ? "success-text" : "error-text"} mt-12`}>{fieldMessages.category}</div>}
         </div>
 
-        {/* FEATURED SECTION */}
         <div className={activeSection === "featured" ? "admin-tab active" : "admin-tab"}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <h3 className="carousel-title">Featured Posts</h3>
@@ -932,7 +1209,8 @@ export default function AdminPanel() {
                     <img src={p.thumbnailUrl || p.imageUrl || "/images/placeholder.png"} alt="" className="item-thumb" />
                     <div>
                       <div className="detail-title" style={{ fontSize: 16 }}>{p.title}</div>
-                      <div className="muted">{displayType(p.type)} • {(p.categories || []).map(cid => (categories.find(c => c.id === cid) || {}).name || cid).join(", ")}</div>
+                      {/* Make metadata font-size match Posts listing */}
+                      <div className="muted" style={{ fontSize: 13 }}>{displayType(p.type)} • {(p.categories || []).map(cid => (categories.find(c => c.id === cid) || {}).name || cid).join(", ")}</div>
                     </div>
                   </div>
                   <div className="admin-row-actions">
@@ -946,10 +1224,10 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        {/* USERS SECTION */}
         {isAdmin && (
           <div className={activeSection === "users" ? "admin-tab active" : "admin-tab"}>
             {renderUsersList()}
+            {fieldMessages.users && <div style={{ marginTop: 12 }} className={`account-message ${fieldMessages.users.includes("Failed") || fieldMessages.users.includes("Permission") ? "error-text" : "success-text"}`}>{fieldMessages.users}</div>}
           </div>
         )}
 

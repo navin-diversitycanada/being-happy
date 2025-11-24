@@ -1,40 +1,17 @@
 // src/pages/VideoLibrary.jsx
-// Modified: include featured in search results and hide featured carousel when searching.
-// Also ensure "No videos yet" only shows when there are truly no items.
+// Changes:
+// - Deduplicate search results (featured + videos combined) to prevent duplicate items showing during search.
 
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listByType, listFeatured } from "../api/posts";
 import { listCategories } from "../api/categories";
 import { getVisibleCountForViewport } from "../utils/carouselHelpers";
+import Breadcrumbs from "../components/Breadcrumbs";
 
 /**
- * VideoLibrary — shows featured video posts and category carousels
+ * VideoLibrary — featured carousel + paginated grid (20 per page) for other videos.
  */
-
-function groupByCategory(items, catsMap) {
-  const map = {};
-  items.forEach(it => {
-    (it.categories || []).forEach(cid => {
-      const name = catsMap[cid] || cid;
-      map[cid] = map[cid] || { id: cid, name, items: [] };
-      map[cid].items.push(it);
-    });
-    if (!it.categories || it.categories.length === 0) {
-      map["__uncat"] = map["__uncat"] || { id: "__uncat", name: "Uncategorized", items: [] };
-      map["__uncat"].items.push(it);
-    }
-  });
-  return Object.values(map);
-}
-
-function timestampToMillis(t) {
-  if (!t) return 0;
-  if (typeof t === "number") return t;
-  if (typeof t.toMillis === "function") return t.toMillis();
-  if (t instanceof Date) return t.getTime();
-  try { return new Date(t).getTime() || 0; } catch { return 0; }
-}
 
 export default function VideoLibrary() {
   const [featured, setFeatured] = useState([]);
@@ -43,24 +20,27 @@ export default function VideoLibrary() {
   const [loading, setLoading] = useState(true);
   const [searchQ, setSearchQ] = useState("");
 
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1);
+
   useEffect(() => {
     let mounted = true;
     async function load() {
       setLoading(true);
       try {
         const [feats, cats, list] = await Promise.all([
-          listFeatured(50).catch(() => []),
+          listFeatured(12).catch(() => []),
           listCategories().catch(() => []),
-          listByType("video", 200).catch(() => [])
+          listByType("video", 12).catch(() => [])
         ]);
         if (!mounted) return;
         const catMap = {};
         (cats || []).forEach(c => { catMap[c.id] = c.name; });
         setCatsMap(catMap);
         const featsVideo = (feats || []).filter(f => (f.type || "").toLowerCase() === "video");
-        const featIds = new Set((featsVideo || []).map(f => f.id));
-        setFeatured(featsVideo.slice(0,20));
-        setVideos((list || []).filter(v => !featIds.has(v.id)));
+        setFeatured(featsVideo.slice(0,12));
+        // Keep full list (include featured)
+        setVideos(list || []);
       } catch (err) {
         console.error("Failed to load videos", err);
         if (!mounted) return;
@@ -72,6 +52,8 @@ export default function VideoLibrary() {
     load();
     return () => { mounted = false; };
   }, []);
+
+  useEffect(() => { setPage(1); }, [searchQ]);
 
   function applySearch(items) {
     const q = (searchQ || "").trim().toLowerCase();
@@ -85,26 +67,39 @@ export default function VideoLibrary() {
     });
   }
 
+  // dedupe helper
+  function uniqueById(arr = []) {
+    const seen = new Set();
+    const out = [];
+    for (const it of arr || []) {
+      if (!it || !it.id) continue;
+      if (seen.has(it.id)) continue;
+      seen.add(it.id);
+      out.push(it);
+    }
+    return out;
+  }
+
   const visibleCount = getVisibleCountForViewport();
 
   const combined = [...(featured || []), ...(videos || [])];
-  const searchResults = applySearch(combined);
+  const searchResultsRaw = applySearch(combined);
+  const searchResults = uniqueById(searchResultsRaw);
 
-  const filtered = videos;
-  const categoriesGrouped = groupByCategory(filtered, catsMap).filter(g => g.items.length >= 3)
-    .map(g => ({ ...g, items: g.items.slice(0, 20).sort((a, b) => timestampToMillis(b.publishedAt || b.createdAt) - timestampToMillis(a.publishedAt || a.createdAt)) }));
-
-  const usedIds = new Set();
-  categoriesGrouped.forEach(g => g.items.forEach(i => usedIds.add(i.id)));
-  const remaining = filtered.filter(it => !usedIds.has(it.id));
+  const gridSource = searchQ.trim() ? searchResults : videos;
+  const total = gridSource.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const start = (page - 1) * PAGE_SIZE;
+  const pageItems = gridSource.slice(start, start + PAGE_SIZE);
 
   function renderCard(item) {
+    const catsLabel = (item.categories || []).map(cid => catsMap[cid] || cid).join(", ");
     return (
       <Link key={item.id} className="card" to={`/video/${item.id}`}>
         <img className="card-img" src={item.thumbnailUrl || item.imageUrl || "/images/placeholder.png"} alt={item.title} />
         <div className="card-content">
           <div className="card-title">{item.title}</div>
-          <div className="card-meta">{(item.categories || []).map(cid => catsMap[cid] || cid).join(", ") || "Video"}</div>
+          {catsLabel ? <div className="card-categories">{catsLabel}</div> : <div className="card-meta">Video</div>}
         </div>
       </Link>
     );
@@ -113,17 +108,28 @@ export default function VideoLibrary() {
   if (searchQ.trim()) {
     return (
       <div className="main-content">
-        <div className="promo-box"><div className="greeting">Video Library</div></div>
+        <div className="promo-box">
+          <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Video Library" }]} />
+          <div style={{ marginTop: 8 }}><div className="greeting">Video Library</div></div>
+        </div>
+
         <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
           <input className="text-input" placeholder="Search videos by title or category" value={searchQ} onChange={(e) => setSearchQ(e.target.value)} />
         </div>
 
         {loading ? <div style={{ padding: 12 }}>Loading…</div> : (
           <>
-            {searchResults.length === 0 ? <div style={{ padding: 12 }}>No results.</div> : (
-              <div className="flex-card-grid">
-                {searchResults.map(renderCard)}
-              </div>
+            {pageItems.length === 0 ? <div style={{ padding: 12 }}>No results.</div> : (
+              <>
+                <div className="flex-card-grid">
+                  {pageItems.map(renderCard)}
+                </div>
+                <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
+                  <button className="see-all-link" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>Prev</button>
+                  <div style={{ padding: "6px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 6 }}>{page} / {totalPages} ({total})</div>
+                  <button className="see-all-link" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Next</button>
+                </div>
+              </>
             )}
           </>
         )}
@@ -133,7 +139,10 @@ export default function VideoLibrary() {
 
   return (
     <div className="main-content">
-      <div className="promo-box"><div className="greeting">Video Library</div></div>
+      <div className="promo-box">
+        <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Video Library" }]} />
+        <div style={{ marginTop: 8 }}><div className="greeting">Video Library</div></div>
+      </div>
 
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
         <input className="text-input" placeholder="Search videos by title or category" value={searchQ} onChange={(e) => setSearchQ(e.target.value)} />
@@ -141,7 +150,6 @@ export default function VideoLibrary() {
 
       {loading && <div style={{ padding: 12 }}>Loading…</div>}
 
-      {/* Featured */}
       {!loading && featured.length > 0 && (
         <section className="carousel-section">
           <div className="carousel-header">
@@ -156,37 +164,26 @@ export default function VideoLibrary() {
             </div>
           </div>
           <div className="carousel-viewport">
-            <div className="carousel" data-carousel="videos-featured">{featured.map(f => renderCard(f))}</div>
+            <div className="carousel" data-carousel="videos-featured">{(featured || []).slice(0,12).map(f => renderCard(f))}</div>
           </div>
         </section>
       )}
 
-      {/* Category carousels */}
-      {!loading && categoriesGrouped.map(group => (
-        <section key={group.id} className="carousel-section">
-          <div className="carousel-header">
-            <span className="carousel-title">{group.name}</span>
-            <div className="carousel-controls">
-              {group.items.length > visibleCount && (
-                <>
-                  <button className="carousel-btn" data-carousel={`video-${group.id}`} data-dir="left">&#8592;</button>
-                  <button className="carousel-btn" data-carousel={`video-${group.id}`} data-dir="right">&#8594;</button>
-                </>
-              )}
+      {!loading && pageItems.length > 0 && (
+        <>
+          <div style={{ marginTop: 18 }}>
+            <h3 className="subcategory-title">All Videos</h3>
+            <div className="flex-card-grid">
+              {pageItems.map(renderCard)}
             </div>
           </div>
-          <div className="carousel-viewport"><div className="carousel" data-carousel={`video-${group.id}`}>{group.items.map(renderCard)}</div></div>
-        </section>
-      ))}
 
-      {/* Remaining Grid */}
-      {!loading && remaining.length > 0 && (
-        <div style={{ marginTop: 18 }}>
-          <h3 className="subcategory-title">All Other Videos</h3>
-          <div className="flex-card-grid">
-            {remaining.map(r => renderCard(r))}
+          <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
+            <button className="see-all-link" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>Prev</button>
+            <div style={{ padding: "6px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 6 }}>{page} / {totalPages} ({total})</div>
+            <button className="see-all-link" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Next</button>
           </div>
-        </div>
+        </>
       )}
 
       {!loading && (combined.length === 0) && <div style={{ padding: 12 }}>No videos yet</div>}
