@@ -163,18 +163,18 @@ export default function Article() {
   return (
     <div className="main-content">
       <div className="detail-card">
-        <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Article", to: "/articles" }, { label: article.title }]} />
+        <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Articles", to: "/articles" }, { label: article.title }]} />
         <img className="detail-img" src={imageSrc} alt={article.title} style={{ maxWidth: "600px" }} />
         <h1 className="detail-title">{article.title}</h1>
         <div className="detail-categories">
-          <Link to={`/category/article`} className="detail-category-box" style={{ textDecoration: "none" }}>Article</Link>
+          <Link to={`/articles`} className="detail-category-box" style={{ textDecoration: "none" }}>Articles</Link>
           {(article.categories || []).map(cid => {
             const name = catsMap[cid] || cid;
             return <Link key={cid} to={`/category/${cid}`} className="detail-category-box" style={{ textDecoration: "none" }}>{name}</Link>;
           })}
         </div>
 
-        <div style={{ marginTop: 12, marginBottom: 14 }}>
+        <div style={{ marginTop: 0, marginBottom: 0 }}>
           <button className="account-action-btn" onClick={toggleFavorite} aria-pressed={isFav} disabled={favLoading}>
             {favLoading ? "…" : (isFav ? "Remove from Favorites" : "Add to Favorites")}
           </button>

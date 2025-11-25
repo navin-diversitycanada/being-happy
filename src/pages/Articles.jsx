@@ -128,7 +128,8 @@ export default function Articles() {
       <div className="main-content">
         <div className="promo-box">
           <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Articles" }]} />
-          <div style={{ marginTop: 8 }}><div className="greeting">Articles</div></div>
+          <div><div className="greeting">Articles</div>
+          <div className="promo-description">Evidence-backed articles and practical tips for everyday wellbeing — read short guides to help you feel better, faster.</div></div>
         </div>
 
         <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
@@ -161,7 +162,11 @@ export default function Articles() {
     <div className="main-content">
       <div className="promo-box">
         <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Articles" }]} />
-        <div style={{ marginTop: 8 }}><div className="greeting">Articles</div></div>
+        <div>
+          <div className="greeting">Articles</div>
+           <div className="promo-description">Evidence-backed articles and practical tips for everyday wellbeing — read short guides to help you feel better, faster.</div>
+        </div>
+         
       </div>
 
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>

@@ -97,9 +97,9 @@ export default function CategoryPage() {
           { label: "Home", to: "/index" },
           { label: catName || "Category" }
         ]} />
-        <div style={{ marginTop: 8 }}>
+        <div>
           <div className="greeting">{catName || "Category"}</div>
-          <div className="promo-description">Browse curated resources and content in this category.</div>
+          <div className="promo-description">Explore curated content across articles, meditations, videos and directories in {catName || "this"} category.</div>
         </div>
       </div>
 

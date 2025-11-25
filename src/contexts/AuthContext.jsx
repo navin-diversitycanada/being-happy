@@ -1,3 +1,4 @@
+// src/contexts/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import {
   onAuthStateChanged,
@@ -25,15 +26,14 @@ export function useAuth() {
  * AuthProvider
  *
  * Notes:
- * - register() now explicitly signs the user out after creating the Auth user,
- *   performing the users/{uid} Firestore write, and sending the verification email.
- *   This ensures newly-registered email/password users are not left signed in.
+ * - register() now explicitly sets the Firebase Auth profile.displayName using
+ *   updateProfile before signing the user out. This ensures the auth user has
+ *   displayName populated so subsequent sign-ins will surface the name.
  *
- * - To avoid a race where the onAuthStateChanged handler would auto-sign-out the
- *   newly-created unverified account before the Firestore write completes, the
- *   registration flow sets suppressAutoSignoutRef.current = true while it runs.
- *   After the registration flow finishes (and we explicitly sign out), the flag
- *   is cleared.
+ * - Social sign-in helpers (Google/Facebook) now prefer any existing users/{uid}.displayName
+ *   value and will NOT overwrite a stored name. If a Firestore user doc has a displayName
+ *   it will be applied to the Firebase Auth profile for the signed in user so the
+ *   displayName remains stable across provider logins.
  */
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -155,8 +155,8 @@ export function AuthProvider({ children }) {
 
   /**
    * register(email, password, extra)
-   * - creates the Auth user, writes users/{uid} doc, sends verification email,
-   *   then explicitly signs the user out so they are not left logged in.
+   * - creates the Auth user, updates the Auth profile displayName (if provided),
+   *   writes users/{uid} doc, sends verification email, then explicitly signs the user out.
    */
   async function register(email, password, extra = {}) {
     if (!navigator.onLine) throw new Error("Online connection required to register.");
@@ -167,15 +167,27 @@ export function AuthProvider({ children }) {
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
 
+      // If caller provided a displayName, set it on the Firebase Auth user profile so it's persisted
+      // on the Auth user record (this ensures subsequent sign-ins surface the name).
+      try {
+        const desiredName = extra.displayName || "";
+        if (desiredName && cred.user) {
+          await fbUpdateProfile(cred.user, { displayName: desiredName });
+        }
+      } catch (updateErr) {
+        console.warn("updateProfile (displayName) during register failed:", updateErr);
+        // proceed — we'll still write displayName to Firestore below
+      }
+
       // Best-effort: create Firestore user doc (merge)
       try {
         await setDoc(doc(db, "users", cred.user.uid), {
           role: "user",
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
-          displayName: extra.displayName || "",
+          displayName: extra.displayName || (cred.user && cred.user.displayName) || "",
           email: cred.user.email || "",
-          photoURL: "",
+          photoURL: cred.user.photoURL || "",
           uid: cred.user.uid,
           ...extra
         }, { merge: true });
@@ -237,7 +249,11 @@ export function AuthProvider({ children }) {
     return signOut(auth);
   }
 
-  // Social sign-in helpers unchanged from prior implementation
+  // Social sign-in helpers enhanced:
+  // - Prefer name stored in users/{uid}.displayName (do not overwrite it).
+  // - If Firestore doc is missing displayName and provider supplies one, write it to Firestore.
+  // - If Firestore doc already has displayName, ensure the Firebase Auth profile uses that displayName
+  //   so the auth.user.displayName remains stable across provider logins.
   async function signInWithGoogle() {
     const provider = googleProvider || new GoogleAuthProvider();
     const cred = await signInWithPopup(auth, provider);
@@ -254,15 +270,26 @@ export function AuthProvider({ children }) {
             throw new Error("Your account is disabled");
           }
 
-          const mergePayload = {};
-          if (!data.displayName && u.displayName) mergePayload.displayName = u.displayName;
-          if (!data.email && u.email) mergePayload.email = u.email;
-          const locked = !!data.photoLocked;
-          if (!locked && !data.photoURL && u.photoURL) mergePayload.photoURL = u.photoURL;
-          if (Object.keys(mergePayload).length) {
-            try { await setDoc(ref, { ...mergePayload, updatedAt: serverTimestamp() }, { merge: true }); } catch (err) { console.warn("Failed to merge provider info into users/{uid} after Google sign-in:", err); }
+          // If Firestore has a displayName, prefer it and apply to Auth profile (do not overwrite Firestore)
+          if (data.displayName && data.displayName !== (u.displayName || "")) {
+            try {
+              await fbUpdateProfile(u, { displayName: data.displayName });
+            } catch (err) {
+              console.warn("Failed to apply stored displayName to auth profile after Google signin:", err);
+            }
+          } else if (!data.displayName && u.displayName) {
+            // Firestore missing displayName, but provider gave one -> store it
+            const mergePayload = { displayName: u.displayName };
+            // preserve photo rules (photoLocked) - only write photoURL if allowed
+            if (!data.photoLocked && u.photoURL) mergePayload.photoURL = u.photoURL;
+            try {
+              await setDoc(ref, { ...mergePayload, updatedAt: serverTimestamp() }, { merge: true });
+            } catch (err) {
+              console.warn("Failed to merge provider info into users/{uid} after Google sign-in:", err);
+            }
           }
         } else {
+          // No user doc -> create one using provider's displayName (if any)
           try {
             await setDoc(ref, {
               role: "user",
@@ -299,17 +326,33 @@ export function AuthProvider({ children }) {
             throw new Error("Your account is disabled");
           }
 
-          const mergePayload = {};
-          if (!data.displayName && u.displayName) mergePayload.displayName = u.displayName;
-          if (!data.email && u.email) mergePayload.email = u.email;
-          const locked = !!data.photoLocked;
-          if (!locked && !data.photoURL && u.photoURL) mergePayload.photoURL = u.photoURL;
-          if (Object.keys(mergePayload).length) {
-            try { await setDoc(ref, { ...mergePayload, updatedAt: serverTimestamp() }, { merge: true }); } catch (err) { console.warn("Failed to merge provider info into users/{uid} after Facebook sign-in:", err); }
+          // If Firestore has a displayName, prefer it and apply to Auth profile
+          if (data.displayName && data.displayName !== (u.displayName || "")) {
+            try {
+              await fbUpdateProfile(u, { displayName: data.displayName });
+            } catch (err) {
+              console.warn("Failed to apply stored displayName to auth profile after Facebook signin:", err);
+            }
+          } else if (!data.displayName && u.displayName) {
+            // Firestore missing displayName, provider gave one -> store it
+            const mergePayload = { displayName: u.displayName };
+            if (!data.photoLocked && u.photoURL) mergePayload.photoURL = u.photoURL;
+            try {
+              await setDoc(ref, { ...mergePayload, updatedAt: serverTimestamp() }, { merge: true });
+            } catch (err) {
+              console.warn("Failed to merge provider info into users/{uid} after Facebook sign-in:", err);
+            }
           }
         } else {
           try {
-            await setDoc(ref, { role: "user", displayName: u.displayName || "", email: u.email || "", photoURL: u.photoURL || "", createdAt: serverTimestamp(), uid: u.uid }, { merge: true });
+            await setDoc(ref, {
+              role: "user",
+              displayName: u.displayName || "",
+              email: u.email || "",
+              photoURL: u.photoURL || "",
+              createdAt: serverTimestamp(),
+              uid: u.uid
+            }, { merge: true });
           } catch (err) {
             console.warn("ensure user doc failed for facebook signin (skipping):", err);
           }

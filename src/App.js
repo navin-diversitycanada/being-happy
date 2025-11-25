@@ -29,6 +29,8 @@ import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 import Featured from "./pages/Featured";
 import ResetPassword from "./pages/ResetPassword";
+import AddToHomeScreen from "./components/AddToHomeScreen";
+
 
 /**
  * RedirectOnAction
@@ -62,8 +64,10 @@ function Layout({ children }) {
   const [open, setOpen] = React.useState(false);
   return (
     <>
+        <AddToHomeScreen />
       <Header onMenuClick={() => setOpen(true)} />
       <Sidebar open={open} onClose={() => setOpen(false)} />
+        
       <main>{children}</main>
     </>
   );

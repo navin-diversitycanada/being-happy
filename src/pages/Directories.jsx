@@ -132,7 +132,8 @@ export default function Directories() {
     <div className="main-content">
       <div className="promo-box">
         <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Directories" }]} />
-        <div style={{ marginTop: 8 }}><div className="greeting">Directories</div><div className="promo-description">Recommended apps, centers and groups</div></div>
+        <div><div className="greeting">Directories</div>
+        <div className="promo-description">Find trusted resources, centers and apps near you — a curated directory of services and groups that support wellbeing.</div></div>
       </div>
 
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>

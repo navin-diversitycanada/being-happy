@@ -99,18 +99,19 @@ export default function Login() {
         <h2 className="auth-title">Login to Being Happy</h2>
 
         <div className="socials">
-          <button className="social-btn" type="button" onClick={handleGoogle}><img src="/images/google.svg" alt="" width="18" /> Continue with Google</button>
-          <button className="social-btn" type="button" onClick={handleFacebook}><img src="/images/facebook.svg" alt="" width="18" /> Continue with Facebook</button>
+          <button className="social-btn" type="button" onClick={handleGoogle}> Continue with Google</button>
+          <button className="social-btn" type="button" onClick={handleFacebook}> Continue with Facebook</button>
         </div>
 
         <hr className="auth-divider" />
+          <h3 className="auth-title-2">Or Login with Email</h3>
         <input type="email" placeholder="Email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         <input type="password" placeholder="Password" required value={password} onChange={(e) => setPassword(e.target.value)} />
         <button type="submit">Login</button>
 
-        {err && <div style={{ color: "salmon", marginTop: 8 }}>{err}</div>}
+        {err && <div style={{ color: "salmon",  marginBottom: 24 }}>{err}</div>}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, marginTop: 12,marginBottom: 12, alignItems: "center" }}>
           <Link className="link-badge" to="/register">Register</Link>
           <Link className="link-badge" to="/reset-password">Forgot password?</Link>
         </div>

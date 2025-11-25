@@ -110,7 +110,10 @@ export default function VideoLibrary() {
       <div className="main-content">
         <div className="promo-box">
           <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Video Library" }]} />
-          <div style={{ marginTop: 8 }}><div className="greeting">Video Library</div></div>
+          <div><div className="greeting">Video Library</div>
+            <div className="promo-description">Curated videos for mindful living — lessons, talks and practices you can watch anytime to build calm and resilience.</div>
+          </div>
+                
         </div>
 
         <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
@@ -141,7 +144,10 @@ export default function VideoLibrary() {
     <div className="main-content">
       <div className="promo-box">
         <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Video Library" }]} />
-        <div style={{ marginTop: 8 }}><div className="greeting">Video Library</div></div>
+        <div><div className="greeting">Video Library</div>
+          <div className="promo-description">Curated videos for mindful living — lessons, talks and practices you can watch anytime to build calm and resilience.</div>
+        </div>
+       
       </div>
 
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>

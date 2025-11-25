@@ -110,7 +110,8 @@ export default function Meditation() {
       <div className="main-content">
         <div className="promo-box">
           <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Meditation" }]} />
-          <div style={{ marginTop: 8 }}><div className="greeting">Meditation</div></div>
+          <div><div className="greeting">Meditation</div>
+             <div className="promo-description">Short guided meditations to help you relax, focus, and sleep — pick a session and start feeling calmer in minutes.</div></div>
         </div>
 
         <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>
@@ -141,7 +142,10 @@ export default function Meditation() {
     <div className="main-content">
       <div className="promo-box">
         <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Meditation" }]} />
-        <div style={{ marginTop: 8 }}><div className="greeting">Meditation</div></div>
+        <div><div className="greeting">Meditation</div>
+          <div className="promo-description">Short guided meditations to help you relax, focus, and sleep — pick a session and start feeling calmer in minutes.</div>
+        </div>
+        
       </div>
 
       <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 12 }}>

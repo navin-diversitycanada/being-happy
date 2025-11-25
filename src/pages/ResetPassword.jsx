@@ -89,8 +89,8 @@ export default function ResetPassword() {
         <p style={{ marginBottom: 12 }} className="muted">Enter the email for your account and we'll send a password reset link.</p>
         <input type="email" placeholder="Email" required value={email} onChange={(e) => setEmail(e.target.value)} />
         <button type="submit" disabled={busy}>{busy ? "Sending…" : "Send reset email"}</button>
-        {sentMsg && <div style={{ color: "#4BB543", marginTop: 8 }}>{sentMsg}</div>}
-        {error && <div style={{ color: "salmon", marginTop: 8 }}>{error}</div>}
+        {sentMsg && <div style={{ color: "salmon",  marginBottom: 24 }}>{sentMsg}</div>}
+        {error && <div style={{ color: "salmon",  marginBottom: 24 }}>{error}</div>}
         <div className="switch" style={{ marginTop: 12 }}>
           <Link className="link-badge" to="/login">Back to Login</Link>
           <span style={{ marginLeft: 8 }} />

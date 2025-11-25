@@ -1,6 +1,6 @@
 // src/pages/TypeCategory.jsx
 // - Use .card-categories (salmon, bold) instead of .card-meta so category/type labels match Articles styling.
-// - Improve promo-description wording.
+// - Improve promo-description wording to use correct plural words for each type.
 
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
@@ -88,6 +88,22 @@ export default function TypeCategory() {
     return tt.charAt(0).toUpperCase() + tt.slice(1);
   }
 
+  // New: return a simple plural word to use in promo-description
+  function pluralLabelForType(t) {
+    const tt = (t || "").toLowerCase();
+    switch (tt) {
+      case "audio":
+        return "meditations";
+      case "video":
+        return "videos";
+      case "directory":
+        return "directories";
+      case "article":
+      default:
+        return "articles";
+    }
+  }
+
   function renderCard(item) {
     const isDirectory = ((type || "").toLowerCase() === "directory");
     const imgSrc = isDirectory ? (item.thumbnailUrl || item.imageUrl || "/images/directoryplaceholder.png") : (item.thumbnailUrl || item.imageUrl || "/images/placeholder.png");
@@ -111,6 +127,9 @@ export default function TypeCategory() {
   const start = (page - 1) * PAGE_SIZE;
   const pageItems = uniqueFiltered.slice(start, start + PAGE_SIZE);
 
+  const promoTypeLabel = pluralLabelForType(type);
+  const promoCategory = catName || "this";
+
   return (
     <div className="main-content">
       <div className="promo-box">
@@ -119,9 +138,13 @@ export default function TypeCategory() {
           { label: catName || "Category", to: `/category/${id}` },
           { label: displayTypeName(type) }
         ]} />
-        <div style={{ marginTop: 8 }}>
+        <div>
           <div className="greeting">{catName || "Category"}</div>
-          <div className="promo-description">{type ? `Browse ${displayTypeName(type)} in this category` : "Items"}</div>
+          <div className="promo-description">
+            {type
+              ? `Browse curated ${promoTypeLabel} in the ${promoCategory} category.`
+              : "Items"}
+          </div>
         </div>
       </div>
 

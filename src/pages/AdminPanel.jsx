@@ -809,7 +809,7 @@ export default function AdminPanel() {
       <div ref={listingsTopRef}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <h3 className="carousel-title">All Posts</h3>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
             <select className="text-input" value={postTypeFilter} onChange={(e) => { setPostTypeFilter(e.target.value); setPostPage(1); }}>
               <option value="all">All types</option>
               <option value="article">Article</option>

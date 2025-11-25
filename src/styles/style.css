@@ -260,9 +260,9 @@ html, body {
 .greeting {
   padding: 0;
   font-size: 28px;
-  font-family: 'Inter', Arial, sans-serif;
+ font-family: 'Lora', serif;
   font-weight: 700;
-  margin: 3px 0 3px 0;
+  margin: 0px 0 3px 0;
   color: var(--cream);
   letter-spacing: 0.2px;
   opacity: 1;
@@ -271,7 +271,7 @@ html, body {
 }
 
 .promo-description {
-  margin-top: 15px;
+  margin-top: 20px;
    font-size: 14px;
 }
 
@@ -286,7 +286,7 @@ html, body {
 /* NOTE: removed .admin-panel button from the global full-width rule so admin buttons are not full-width */
 .auth-form,
 .profile-form {
-  max-width: 400px;
+  max-width: 500px;
   width: 100%;
   margin: 32px auto;
   background: rgba(255,255,255,0.04);
@@ -407,7 +407,7 @@ html, body {
   font-weight: 900;
   font-size: 38px;
   color: var(--cream);
-  margin-bottom: 10px;
+
   text-align: left;
   letter-spacing: 0.5px;
 }
@@ -416,7 +416,7 @@ html, body {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 20px;
+
 }
 
 .account-category-box {
@@ -436,7 +436,7 @@ html, body {
   font-size: 18px;
   color: var(--white);
   font-family: 'Inter', Arial, sans-serif;
-  margin-bottom: 18px;
+
   line-height: 1.6;
 }
 
@@ -446,7 +446,7 @@ html, body {
   flex-direction: row;
   justify-content: flex-start;
   gap: 18px;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .account-action-btn {
@@ -1212,7 +1212,7 @@ html, body {
 .admin-extra select,
 .admin-extra input[type="file"] {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   border-radius: 7px;
   border: none;
   box-sizing: border-box;
@@ -2182,6 +2182,7 @@ html, body {
 
 /* Link badge pills used for auth links and small inline links */
 .link-badge {
+      letter-spacing: 0.5px;
   display: inline-block;
   background: var(--cream);
   color: var(--purple);
@@ -2191,7 +2192,7 @@ html, body {
   text-decoration: none !important;
   font-family: 'Bebas Neue', cursive, Arial, sans-serif;
   text-transform: none;
-  font-size: 14px;
+  font-size: 15px;
   border: none;
   cursor: pointer;
   box-shadow: 0 3px 10px rgba(7,24,46,0.06);
@@ -2753,3 +2754,273 @@ img[src$="directoryplaceholder.png"], img[src*="directoryplaceholder.png"] {
 }
 
 /* End of appended snippet */
+
+
+.auth-divider
+{
+  margin-bottom: 25px;
+}
+
+
+.auth-title, .auth-title-2
+{
+  margin-top: 0px;
+ font-family: 'Lora', serif;
+  font-weight: 900;
+  font-size: 28px;
+  color: var(--cream);
+  text-align: center;
+}
+
+
+ .auth-title-2
+{
+   font-size: 20px;
+}
+
+/* src/styles/heading-overrides.css
+ *
+ * Override/lock H2 and H3 sizes as requested:
+ *  - H2: 28px on desktop, 22px below 700px
+ *  - H3: 20px on desktop, 16px below 700px
+ *
+ * This file is intentionally small and scoped to the content areas where headings appear.
+ * You can either:
+ *  - Append these rules to the end of your existing src/styles/style.css (recommended),
+ *  - Or import this new file after style.css (e.g. from index.js or App.jsx) so it loads last.
+ *
+ * The rules use simple selectors that match existing rules in style.css and include !important
+ * to ensure they take precedence regardless of load order. If you prefer to avoid !important,
+ * append these rules to the end of style.css instead.
+ */
+
+/* Desktop / default sizes */
+.article-content h2,
+.detail-description h2,
+.directory-content h2,
+.detail-card h2,
+.detail-card h2 * {
+  font-size: 28px !important;
+  line-height: 1.12 !important;
+  /* keep the title-like styling already used */
+  font-family: 'Lora', serif !important;
+  font-weight: 900 !important;
+  color: var(--cream) !important;
+  margin-top: 18px !important;
+  margin-bottom: 12px !important;
+  letter-spacing: 0.6px !important;
+}
+
+.article-content h3,
+.detail-description h3,
+.directory-content h3,
+.detail-card h3,
+.detail-card h3 * {
+  font-size: 20px !important;
+  line-height: 1.4 !important;
+  font-family: 'Lora', serif !important;
+  font-weight: 900 !important;
+  color: var(--cream) !important;
+  margin-top: 14px !important;
+  margin-bottom: 10px !important;
+  letter-spacing: 0.8px !important;
+}
+
+/* Mobile / small screens: below 700px */
+@media (max-width: 700px) {
+  .article-content h2,
+  .detail-description h2,
+  .directory-content h2,
+  .detail-card h2,
+  .detail-card h2 * {
+    font-size: 22px !important;
+    line-height: 1.4 !important;
+      letter-spacing: 0.4px !important;
+  }
+
+  .article-content h3,
+  .detail-description h3,
+  .directory-content h3,
+  .detail-card h3,
+  .detail-card h3 * {
+    font-size: 16px !important;
+    line-height: 1.4 !important;
+      letter-spacing: 0.4px !important;
+  }
+}
+
+
+/* ---------- UPDATE: Add-to-home-screen banner (vertical layout: title -> content -> stacked buttons) ----------
+   Replace previous .bh-ath-banner/.bh-ath-content/.bh-ath-actions rules with this block.
+   Layout:
+   - Title (Lora, cream)
+   - Content paragraph(s) (Inter, white) below title with margin
+   - Buttons stacked vertically below content, left-aligned, each min-width:120px (not full width)
+   - Banner sits above header as DOM sibling (render AddToHomeScreen before Header)
+---------------------------------------------------------------------*/
+
+/* Hide the banner on wide desktop screens (>=1000px) */
+@media (min-width: 1000px) {
+  .bh-ath-banner,
+  .bh-ath-modal { display: none !important; }
+}
+
+/* Banner as a block that sits above header in DOM flow (rendered before header) */
+.bh-ath-banner {
+  position: relative;
+  width: 100%;
+  background: var(--background);
+  color: var(--white);
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.26);
+  z-index: 50;
+  font-family: Inter, Arial, sans-serif;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 12px 16px;
+  border: 1px solid rgba(255,255,255,0.03);
+  transition: transform 160ms ease, box-shadow 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+  overflow: visible;
+  margin: 0;
+}
+
+/* Slight hover lift on pointer devices (tablet/desktop with mouse) */
+@media (hover: hover) and (pointer: fine) {
+  .bh-ath-banner:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 14px 36px rgba(0,0,0,0.32);
+  }
+}
+
+/* Internal content container: column layout so title -> content -> buttons stack vertically */
+.bh-ath-banner .bh-ath-content {
+  width: 100%;
+  max-width: 1080px;
+  display: flex;
+  flex-direction: column;    /* stack vertically */
+  align-items: flex-start;   /* left-align content */
+  justify-content: flex-start;
+  gap: 0px;
+  padding: 4px 2px;
+  box-sizing: border-box;
+}
+
+/* Text block styles */
+.bh-ath-text {
+  width: 100%;
+  text-align: left;
+  min-width: 0;
+}
+
+/* Heading uses Lora and cream color, with margin below */
+.bh-ath-text strong,
+.bh-ath-modal-inner h3 {
+  font-family: 'Lora', serif;
+  color: var(--cream);
+  font-size: 18px;
+  font-weight: 900;
+  display: block;
+  margin: 0 0 8px 0; /* space below title */
+  line-height: 1.05;
+}
+
+/* Paragraph / body text uses Inter and white color, with margin below */
+.bh-ath-sub,
+.bh-ath-text p,
+.bh-ath-text .bh-ath-sub,
+.bh-ath-modal-inner p,
+.bh-ath-modal-inner ol,
+.bh-ath-modal-inner li {
+  font-family: 'Inter', Arial, sans-serif;
+  color: var(--white);
+  font-size: 14px;
+  margin: 0 0 10px 0; /* spacing below content */
+  line-height: 1.45;
+}
+
+/* Actions block placed under the text (stacked vertically) */
+.bh-ath-actions {
+  display: flex;
+  flex-direction: column; /* stacked buttons, one after another */
+  gap: 8px;
+  align-items: flex-start; /* left align buttons */
+  justify-content: flex-start;
+  width: auto;
+}
+
+/* Buttons: both Add and Dismiss use min-width:120px and are not full-width */
+.bh-ath-btn {
+  min-width: 120px;
+  padding: 10px 14px;
+  font-size: 16px;
+  border-radius: 7px;
+  cursor: pointer;
+  box-sizing: border-box;
+  font-weight: 700;
+}
+
+/* Primary Add button: adopt .auth-form button visuals */
+.bh-ath-btn.bh-ath-add {
+  background: var(--purple);
+  color: var(--cream);
+  border: none;
+}
+
+/* Secondary Dismiss button: subtle outline */
+.bh-ath-btn.bh-ath-dismiss {
+  background: var(--cream);
+  color: var(--purple);
+  border: 1px solid rgba(255,255,255,0.06);
+      font-size: 25px;
+    padding: 4px 12px;
+}
+
+/* Responsive: on very narrow screens keep buttons side-by-side to save vertical space (optional) */
+@media (max-width: 420px) {
+  .bh-ath-actions { flex-direction: row; gap: 8px; align-items: center; }
+  .bh-ath-btn { min-width: 120px; padding: 10px 12px; font-size: 15px; }
+  .bh-ath-content { gap: 0px; }
+}
+
+/* Modal overlay for iOS instructions (headings/text follow same fonts/colors) */
+.bh-ath-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10095;
+  background: rgba(0,0,0,0.45);
+  padding: 18px;
+}
+
+.bh-ath-modal-inner {
+  background: #fff;
+  color: #222;
+  width: 100%;
+  max-width: 420px;
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.35);
+  font-family: Inter, Arial, sans-serif;
+}
+
+.bh-ath-modal-inner h3 {
+  font-family: 'Lora', serif;
+  color: var(--cream);
+  margin-bottom: 8px;
+}
+
+.bh-ath-modal .bh-ath-btn {
+  padding: 12px;
+  font-size: 18px;
+  border-radius: 7px;
+  background: var(--purple);
+  color: var(--white);
+  border: none;
+  cursor: pointer;
+}
+
+/* ------------------ END vertical banner rules ------------------ */

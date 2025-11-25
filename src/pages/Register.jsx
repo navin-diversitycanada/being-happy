@@ -78,7 +78,7 @@ export default function Register() {
             onClick={handleGoogle}
             disabled={busy}
           >
-            <img src="/images/google.svg" alt="" width="18" /> Continue with Google
+           Continue with Google
           </button>
           <button
             className="social-btn"
@@ -86,10 +86,11 @@ export default function Register() {
             onClick={handleFacebook}
             disabled={busy}
           >
-            <img src="/images/facebook.svg" alt="" width="18" /> Continue with Facebook
+            Continue with Facebook
           </button>
         </div>
         <hr className="auth-divider" />
+           <h3 className="auth-title-2">Or Register with Email</h3>
         <input
           type="text"
           placeholder="Full Name"
@@ -133,10 +134,11 @@ export default function Register() {
         </button>
 
         {/* All messages/errors appear below the button in salmon color */}
-        {err && <div style={{ color: "salmon", marginTop: 8 }}>{err}</div>}
+        {err && <div style={{ color: "salmon",   marginBottom: 24 }}>{err}</div>}
 
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <Link className="link-badge" to="/login">Already have an account? Login</Link>
+        <div style={{ display: "flex", gap: 8, marginTop: 12, marginBottom: 12, alignItems: "center" }}>
+          <Link className="link-badge" to="/login">Back to Login</Link>
+          <Link className="link-badge" to="/reset-password">Forgot password?</Link>
         </div>
       </form>
     </div>

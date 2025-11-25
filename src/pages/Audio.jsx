@@ -140,16 +140,17 @@ export default function Audio() {
   return (
     <div className="main-content">
       <div className="detail-card">
-        <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Meditation", to: "/meditation" }, { label: audio.title }]} />
+        <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Meditations", to: "/meditation" }, { label: audio.title }]} />
         <img className="detail-img" src={imageSrc} alt={audio.title} style={{ maxWidth: "600px" }} />
         <h1 className="detail-title">{audio.title}</h1>
         <div className="detail-categories">
+              <Link to={`/meditation`} className="detail-category-box" style={{ textDecoration: "none" }}>Meditations</Link>
           {(audio.categories || []).map(cid => (
             <Link key={cid} to={`/category/${cid}`} className="detail-category-box" style={{ textDecoration: "none" }}>{catsMap[cid] || cid}</Link>
           ))}
         </div>
 
-        <div style={{ marginTop: 12, marginBottom: 14 }}>
+        <div style={{ marginTop: 0, marginBottom: 0 }}>
           <button className="account-action-btn" onClick={toggleFavorite} aria-pressed={isFav} disabled={favLoading}>
             {favLoading ? "…" : (isFav ? "Remove from Favorites" : "Add to Favorites")}
           </button>

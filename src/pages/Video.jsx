@@ -141,16 +141,17 @@ export default function Video() {
   return (
     <div className="main-content">
       <div className="detail-card">
-        <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Video", to: "/video-library" }, { label: video.title }]} />
+        <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Videos", to: "/video-library" }, { label: video.title }]} />
         <img className="detail-img" src={imageSrc} alt={video.title} style={{ maxWidth: "600px" }} />
         <h1 className="detail-title">{video.title}</h1>
         <div className="detail-categories">
+           <Link to={`/video-library`} className="detail-category-box" style={{ textDecoration: "none" }}>Videos</Link>
           {(video.categories || []).map(cid => (
             <Link key={cid} to={`/category/${cid}`} className="detail-category-box" style={{ textDecoration: "none" }}>{catsMap[cid] || cid}</Link>
           ))}
         </div>
 
-        <div style={{ marginTop: 12, marginBottom: 14 }}>
+        <div style={{ marginTop: 0, marginBottom: 0 }}>
           <button className="account-action-btn" onClick={toggleFavorite} aria-pressed={isFav} disabled={favLoading}>
             {favLoading ? "…" : (isFav ? "Remove from Favorites" : "Add to Favorites")}
           </button>

@@ -67,7 +67,10 @@ export default function Featured() {
     <div className="main-content">
       <div className="promo-box">
         <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Featured" }]} />
-        <div style={{ marginTop: 8 }}><div className="greeting">Featured</div></div>
+        <div><div className="greeting">Featured</div>
+        <div className="promo-description">Discover hand-picked featured content — editor's picks of articles, meditations, videos and resources to help you feel better today.</div>
+        </div>
+        
       </div>
 
       <div className="carousel-section">
