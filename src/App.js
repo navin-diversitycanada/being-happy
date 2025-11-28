@@ -1,6 +1,6 @@
 // src/App.js
-// Change: make /index (Home) public (no ProtectedRoute wrapper) so Home is visible to non logged-in users.
-// Other routes remain protected as before.
+// Update: add LocationPosts route at /location/:id (protected like Directories)
+// Full file with the new route included.
 
 import React from "react";
 import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
@@ -20,6 +20,7 @@ import VideoLibrary from "./pages/VideoLibrary";
 import Video from "./pages/Video";
 import Directories from "./pages/Directories";
 import Directory from "./pages/Directory";
+import LocationPosts from "./pages/LocationPosts";
 import CategoryPage from "./pages/CategoryPage";
 import TypeCategory from "./pages/TypeCategory";
 import Account from "./pages/Account";
@@ -30,7 +31,6 @@ import NotFound from "./pages/NotFound";
 import Featured from "./pages/Featured";
 import ResetPassword from "./pages/ResetPassword";
 import AddToHomeScreen from "./components/AddToHomeScreen";
-
 
 /**
  * RedirectOnAction
@@ -86,7 +86,7 @@ export default function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
-            {/* Home is now public */}
+            {/* Home is public */}
             <Route path="/index" element={<Home />} />
 
             {/* Lists */}
@@ -101,6 +101,9 @@ export default function App() {
             <Route path="/audio/:id" element={<ProtectedRoute><Audio /></ProtectedRoute>} />
             <Route path="/video/:id" element={<ProtectedRoute><Video /></ProtectedRoute>} />
             <Route path="/directory/:id" element={<ProtectedRoute><Directory /></ProtectedRoute>} />
+
+            {/* Location posts page */}
+            <Route path="/location/:id" element={<ProtectedRoute><LocationPosts /></ProtectedRoute>} />
 
             {/* Category pages */}
             <Route path="/category/:id" element={<ProtectedRoute><CategoryPage /></ProtectedRoute>} />

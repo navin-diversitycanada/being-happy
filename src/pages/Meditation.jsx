@@ -1,5 +1,6 @@
 // src/pages/Meditation.jsx
 // Changes:
+// - Use listFeatured(12, 'audio') to fetch up to 12 latest featured audio posts for the Featured carousel.
 // - Deduplicate search results when combining featured + audios.
 
 import React, { useEffect, useState } from "react";
@@ -29,7 +30,7 @@ export default function Meditation() {
       setLoading(true);
       try {
         const [feats, cats, list] = await Promise.all([
-          listFeatured(12).catch(() => []),
+          listFeatured(12, "audio").catch(() => []),
           listCategories().catch(() => []),
           listByType("audio", 12).catch(() => [])
         ]);
@@ -37,8 +38,7 @@ export default function Meditation() {
         const catMap = {};
         (cats || []).forEach(c => { catMap[c.id] = c.name; });
         setCatsMap(catMap);
-        const featsAudio = (feats || []).filter(f => (f.type || "").toLowerCase() === "audio");
-        setFeatured(featsAudio.slice(0,12));
+        setFeatured(feats.slice(0,12));
         // Keep the full list (include featured)
         setAudios(list || []);
       } catch (err) {

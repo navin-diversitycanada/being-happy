@@ -143,14 +143,29 @@ export async function listByCategory(categoryId, type = null, limitN = 200, fetc
 }
 
 /**
- * listFeatured: default limit now 12 (per request)
+ * listFeatured
+ * - Now accepts optional `type` to restrict to a specific type (e.g. "article")
+ *   or `excludeType` to omit a specific type (e.g. "directory").
+ * - Returns up to limitN latest featured, published posts that match filters.
  */
-export async function listFeatured(limitN = 12, fetchWindow = 400) {
+export async function listFeatured(limitN = 12, type = null, excludeType = null, fetchWindow = 400) {
   try {
+    // fetch a window of recent posts and filter locally (avoids missing composite index problems)
     const q = query(postsCol, orderBy("publishedAt", "desc"), limit(fetchWindow));
     const snap = await getDocs(q);
     const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const featured = docs.filter(it => !!it && !!it.published && !!it.featured);
+    let featured = docs.filter(it => !!it && !!it.published && !!it.featured);
+
+    // apply type inclusion filter if provided
+    if (type) {
+      featured = featured.filter(it => (it.type || "").toLowerCase() === (type || "").toLowerCase());
+    }
+
+    // apply exclusion filter if provided
+    if (excludeType) {
+      featured = featured.filter(it => (it.type || "").toLowerCase() !== (excludeType || "").toLowerCase());
+    }
+
     featured.sort((a, b) => timestampToMillis(b.publishedAt || b.createdAt) - timestampToMillis(a.publishedAt || a.createdAt));
     return featured.slice(0, limitN);
   } catch (err) {

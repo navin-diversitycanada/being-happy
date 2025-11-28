@@ -1,5 +1,6 @@
 // src/pages/VideoLibrary.jsx
 // Changes:
+// - Use listFeatured(12, 'video') to fetch up to 12 latest featured video posts for the Featured carousel.
 // - Deduplicate search results (featured + videos combined) to prevent duplicate items showing during search.
 
 import React, { useEffect, useState } from "react";
@@ -29,7 +30,7 @@ export default function VideoLibrary() {
       setLoading(true);
       try {
         const [feats, cats, list] = await Promise.all([
-          listFeatured(12).catch(() => []),
+          listFeatured(12, "video").catch(() => []),
           listCategories().catch(() => []),
           listByType("video", 12).catch(() => [])
         ]);
@@ -37,8 +38,7 @@ export default function VideoLibrary() {
         const catMap = {};
         (cats || []).forEach(c => { catMap[c.id] = c.name; });
         setCatsMap(catMap);
-        const featsVideo = (feats || []).filter(f => (f.type || "").toLowerCase() === "video");
-        setFeatured(featsVideo.slice(0,12));
+        setFeatured(feats.slice(0,12));
         // Keep full list (include featured)
         setVideos(list || []);
       } catch (err) {

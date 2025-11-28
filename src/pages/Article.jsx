@@ -1,6 +1,6 @@
 // src/pages/Article.jsx
-// Updated: title renders as H1 (no inline margin) so CSS can control spacing.
-// transformContentHeadings now also sets letter-spacing and larger margins for H2/H3.
+// Updated: ensure anchors rendered in article content open in a new tab (target="_blank" + rel="noopener noreferrer")
+// transformContentHeadings also sets H2/H3 spacing and sizes.
 
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
@@ -13,6 +13,7 @@ import Breadcrumbs from "../components/Breadcrumbs";
 /**
  * Helper: transform headings in HTML to apply title-like styling (keeps font family/weight/color)
  * but with smaller font sizes for H2/H3 and increased letter-spacing + margins.
+ * Also ensures any links open in a new tab with appropriate rel attributes.
  * Returns transformed HTML string.
  */
 function transformContentHeadings(html) {
@@ -42,6 +43,16 @@ function transformContentHeadings(html) {
       hr.style.marginBottom = "18px";
       hr.style.border = "none";
       hr.style.borderTop = "1px solid rgba(255,255,255,0.06)";
+    });
+
+    // Ensure all links open in new tab and are safe
+    doc.querySelectorAll("a").forEach(a => {
+      try {
+        a.setAttribute("target", "_blank");
+        a.setAttribute("rel", "noopener noreferrer");
+      } catch (e) {
+        // ignore
+      }
     });
 
     return doc.body.innerHTML || "";
@@ -167,7 +178,6 @@ export default function Article() {
         <img className="detail-img" src={imageSrc} alt={article.title} style={{ maxWidth: "600px" }} />
         <h1 className="detail-title">{article.title}</h1>
         <div className="detail-categories">
-          <Link to={`/articles`} className="detail-category-box" style={{ textDecoration: "none" }}>Articles</Link>
           {(article.categories || []).map(cid => {
             const name = catsMap[cid] || cid;
             return <Link key={cid} to={`/category/${cid}`} className="detail-category-box" style={{ textDecoration: "none" }}>{name}</Link>;

@@ -1,6 +1,5 @@
 // src/pages/Video.jsx
-// Updated: title renders as H1 (no inline margin), transformContentHeadings sets letter-spacing + margins.
-// Detail image keeps max-width via inline style but spacing is controlled in CSS.
+// Updated: ensure anchors in video content open in new tabs and H2/H3 styling applied.
 
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
@@ -34,6 +33,14 @@ function transformContentHeadings(html) {
       hr.style.marginBottom = "18px";
       hr.style.border = "none";
       hr.style.borderTop = "1px solid rgba(255,255,255,0.06)";
+    });
+
+    // Ensure links open in a new tab
+    doc.querySelectorAll("a").forEach(a => {
+      try {
+        a.setAttribute("target", "_blank");
+        a.setAttribute("rel", "noopener noreferrer");
+      } catch (e) { /* ignore */ }
     });
 
     return doc.body.innerHTML || "";
@@ -145,7 +152,7 @@ export default function Video() {
         <img className="detail-img" src={imageSrc} alt={video.title} style={{ maxWidth: "600px" }} />
         <h1 className="detail-title">{video.title}</h1>
         <div className="detail-categories">
-           <Link to={`/video-library`} className="detail-category-box" style={{ textDecoration: "none" }}>Videos</Link>
+    
           {(video.categories || []).map(cid => (
             <Link key={cid} to={`/category/${cid}`} className="detail-category-box" style={{ textDecoration: "none" }}>{catsMap[cid] || cid}</Link>
           ))}

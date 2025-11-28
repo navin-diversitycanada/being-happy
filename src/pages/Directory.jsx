@@ -1,5 +1,9 @@
 // src/pages/Directory.jsx
-// Updated: title renders as H1 (no inline margin) and transformContentHeadings adds letter-spacing + margins.
+// Updated:
+// - Location badge font-size set to 13px
+// - Badge container bottom margin set to 20px
+// - detail-title margin-bottom set to 20px
+// - Ensure anchors in transformed content open in new tab.
 
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
@@ -33,6 +37,14 @@ function transformContentHeadings(html) {
       hr.style.marginBottom = "18px";
       hr.style.border = "none";
       hr.style.borderTop = "1px solid rgba(255,255,255,0.06)";
+    });
+
+    // Ensure links open in new tabs (safe)
+    doc.querySelectorAll("a").forEach(a => {
+      try {
+        a.setAttribute("target", "_blank");
+        a.setAttribute("rel", "noopener noreferrer");
+      } catch (e) { /* ignore */ }
     });
 
     return doc.body.innerHTML || "";
@@ -138,30 +150,69 @@ export default function Directory() {
   const imageSrc = dir.imageUrl || dir.thumbnailUrl || "/images/directoryplaceholder.png";
   const contentHtml = transformContentHeadings(dir.content || dir.excerpt || dir.desc || "");
 
+  // Build breadcrumb-like location bubbles linking to location posts
+  // We rely on ids in dir.location: countryId, provinceId, cityId and names
+  const loc = dir.location || null;
+  const crumbs = [];
+  if (loc) {
+    if (loc.countryId && loc.countryName) crumbs.push({ id: loc.countryId, name: loc.countryName, type: "country" });
+    if (loc.provinceId && loc.provinceName) crumbs.push({ id: loc.provinceId, name: loc.provinceName, type: "province" });
+    if (loc.cityId && loc.cityName) crumbs.push({ id: loc.cityId, name: loc.cityName, type: "city" });
+  }
+
   return (
     <div className="main-content">
       <div className="detail-card">
         <Breadcrumbs items={[{ label: "Home", to: "/index" }, { label: "Directories", to: "/directories" }, { label: dir.title }]} />
         <img className="detail-img" style={{ maxWidth: 300 }} src={imageSrc} alt={dir.title} />
-        <h1 className="detail-title">{dir.title}</h1>
+        <h1 className="detail-title" style={{ marginBottom: 20 }}>{dir.title}</h1>
 
         <div className="detail-categories">
-              <Link to={`/directories`} className="detail-category-box" style={{ textDecoration: "none" }}>Directories</Link>
           {(dir.categories || []).map(cid => (
             <Link key={cid} to={`/category/${cid}`} className="detail-category-box" style={{ textDecoration: "none" }}>{catsMap[cid] || cid}</Link>
           ))}
         </div>
 
-        <div style={{ marginTop: 0, marginBottom: 0 }}>
+        {/* Breadcrumb bubbles: removed top margin and instead apply bottom margin 20px */}
+        {crumbs.length > 0 && (
+          <div style={{ marginTop: 0, marginBottom: 20, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            
+            {crumbs.map((c, idx) => (
+              <React.Fragment key={c.id}>
+                <Link
+                  to={`/location/${c.id}`}
+                  className="detail-location-badge"
+                  style={{
+                    display: "inline-block",
+                    color: "var(--white)",
+                    fontWeight: 700,
+                    maxWidth: "100%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                    textDecoration: "none",
+                    fontSize: 13
+                  }}
+                  title={c.name}
+                >
+                  {c.name}
+                </Link>
+                {idx < crumbs.length - 1 && <span style={{ color: "var(--cream)", opacity: 0.8, marginLeft: "10px" }}>›</span>}
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+
+        <div style={{ marginTop: 12 }}>
           <button className="account-action-btn" onClick={toggleFavorite} aria-pressed={isFav} disabled={favLoading}>
             {favLoading ? "…" : (isFav ? "Remove from Favorites" : "Add to Favorites")}
           </button>
-          {visitUrl && <a className="account-action-btn" href={visitUrl} target="_blank" rel="noreferrer" style={{ marginLeft: 8 }}>Visit</a>}
+          {visitUrl && <a className="account-action-btn" href={visitUrl} target="_blank" rel="noopener noreferrer" style={{ marginLeft: 8 }}>Visit</a>}
         </div>
 
         {favError && <div className="account-message" style={{ marginTop: 8 }}>{favError}</div>}
 
-        <div className="detail-description"><strong>Description:</strong> <div dangerouslySetInnerHTML={{ __html: contentHtml }} /></div>
+        <div className="detail-description"> <div dangerouslySetInnerHTML={{ __html: contentHtml }} /></div>
 
         {(dir.extra && (dir.extra.phone || dir.extra.contact)) && (
           <div className="detail-description"><strong>Contact:</strong> {dir.extra?.phone || dir.extra?.contact}</div>

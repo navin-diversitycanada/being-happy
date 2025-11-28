@@ -100,7 +100,7 @@ export default function Login() {
 
         <div className="socials">
           <button className="social-btn" type="button" onClick={handleGoogle}> Continue with Google</button>
-          <button className="social-btn" type="button" onClick={handleFacebook}> Continue with Facebook</button>
+       {/*   <button className="social-btn" type="button" onClick={handleFacebook}> Continue with Facebook</button>  */}
         </div>
 
         <hr className="auth-divider" />

@@ -1354,11 +1354,12 @@ html, body {
   margin: 0 0 12px 0;
   line-height: 1.06;
   letter-spacing: -0.2px;
+  margin-bottom: 20px;
 }
 
 .landing-sub {
-  color: rgba(245,233,222,0.92); /* cream with slight opacity */
-  max-width: 780px;
+  color: var(--white); /* cream with slight opacity */
+  max-width: 600px;
   margin: 0 auto 24px auto;
   font-size: 15px;
   line-height: 1.6;
@@ -1367,7 +1368,7 @@ html, body {
 /* CTA uses purple gradient variable */
 .landing-cta {
   display: inline-block;
-  background: var(--purple-grad);
+  background: var(--purple);
   color: var(--white);
   padding: 12px 30px;
   border-radius: 999px;
@@ -1375,6 +1376,7 @@ html, body {
   text-decoration: none;
   box-shadow: 0 8px 28px rgba(113,77,102,0.18);
   transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.12s;
+      margin-top: 10px;
 }
 .landing-cta:hover { transform: translateY(-3px); opacity: 0.98; }
 
@@ -1387,8 +1389,13 @@ html, body {
 .landing-features .section-title {
   margin-bottom: 28px;
   color: var(--cream);
-  font-size: 22px;
-  font-weight: 700;
+  text-align: center;
+}
+
+.landing-main .section-title
+{
+   text-align: center;
+   font-size: 30px;
 }
 
 .landing-features-grid {
@@ -1403,7 +1410,7 @@ html, body {
 .landing-feature {
   text-align: left;
   background: transparent;
-  padding: 18px;
+  padding: 20px 0px;
   border-radius: 12px;
 }
 .landing-feature .feature-icon {
@@ -1428,6 +1435,11 @@ html, body {
   margin-bottom: 10px;
 }
 
+.landing-feature .landing-cta
+{
+  font-size: 13px;
+}
+
 /* BLOG GRID */
 .landing-blog {
   padding: 0px 20px;
@@ -1436,13 +1448,13 @@ html, body {
 }
 .landing-blog .section-title {
   color: var(--cream);
-  margin-bottom: 26px;
+  margin-bottom: 40px;
 }
 .landing-blog-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 22px;
-  max-width: 1200px;
+  max-width: 1100px;
   margin: 0 auto;
   padding: 0 12px;
 }
@@ -1484,7 +1496,7 @@ html, body {
   text-align: center;
   background: linear-gradient(180deg, rgba(7,24,46,0.02), rgba(7,24,46,0.04));
 }
-.landing-testimonials .section-title { color: var(--cream); margin-bottom: 24px; }
+.landing-testimonials .section-title { color: var(--cream); margin-bottom: 40px; }
 
 .testimonials-row {
   display: grid;
@@ -1496,7 +1508,7 @@ html, body {
 }
 
 .testimonial-card {
-  background: var(--purple-grad);
+  background: var(--purple);
   color: var(--cream);
   padding: 28px;
   border-radius: 14px;
@@ -1507,24 +1519,25 @@ html, body {
   box-shadow: 0 6px 24px rgba(113,77,102,0.08);
 }
 .testimonial-card .quote {
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.5;
   margin: 0 0 12px 0;
+  font-style: italic;
 }
 .testimonial-card footer {
-  font-size: 13px;
+  font-size: 16px;
   opacity: 0.95;
 }
 
 /* FAQ */
 .landing-faq {
   padding: 0px 20px;
-  max-width: 900px;
+  max-width: 1100px;
   margin: 0 auto;
 }
 .landing-faq .section-title {
   text-align: center;
-  margin-bottom: 20px;
+  margin-bottom: 40px;
   color: var(--cream);
 }
 .landing-faq details {
@@ -1556,9 +1569,9 @@ html, body {
   .landing-hero { height: 56vh; min-height: 420px; }
   .landing-hero-content { margin-top: 12vh; padding: 22px; }
   .landing-hero h1 { font-size: 34px; }
-  .landing-features-grid { grid-template-columns: repeat(2, 1fr); max-width: 860px; }
-  .landing-blog-grid { grid-template-columns: repeat(2, 1fr); }
-  .testimonials-row { grid-template-columns: repeat(2, 1fr); }
+  .landing-features-grid { grid-template-columns: repeat(3, 1fr); max-width: 860px; }
+  .landing-blog-grid { grid-template-columns: repeat(3, 1fr); }
+  .testimonials-row { grid-template-columns: repeat(3, 1fr); }
   .landing-hero-overlay { background: linear-gradient(180deg, rgba(113,77,102,0.36) 0%, rgba(7,24,46,0.04) 60%); }
 }
 
@@ -1576,7 +1589,7 @@ html, body {
 }
 
 /* Small utilities scoped to landing using theme colors */
-.landing .muted { color: rgba(245,233,222,0.78); }
+.landing .muted { color:var(--white); font-size: 15px;;}
 
 
 /* ---------- Mobile fix: ensure account action buttons stay visible (wrap / stack) ---------- */
@@ -2749,7 +2762,7 @@ img[src$="directoryplaceholder.png"], img[src*="directoryplaceholder.png"] {
 .article-content,
 .detail-description,
 .directory-content {
-  margin-top: 10px;
+  margin-top: 30px;
   margin-bottom: 18px;
 }
 
@@ -3024,3 +3037,14 @@ img[src$="directoryplaceholder.png"], img[src*="directoryplaceholder.png"] {
 }
 
 /* ------------------ END vertical banner rules ------------------ */
+
+
+.admin-list .admin-row-left
+{
+  max-width: 50%;
+}
+
+/* Ensure post titles in admin All Posts listing use white (override earlier admin rules) */
+.admin-panel .admin-list .admin-list-post-title {
+  color: var(--white) !important;
+}

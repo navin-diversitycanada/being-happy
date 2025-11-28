@@ -1,7 +1,7 @@
 // src/pages/Directories.jsx
 // Changes:
-// - Deduplicate search results by id to avoid duplicated items in search results (featured+dirs merge).
-// - Use deduped results for rendering.
+// - Use listFeatured(12, 'directory') to fetch up to 12 latest featured directory posts for the Featured carousel.
+// - Deduplicate search results by id preserving order.
 
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -32,7 +32,7 @@ export default function Directories() {
       setLoading(true);
       try {
         const [feats, cats, list] = await Promise.all([
-          listFeatured(12).catch(() => []),
+          listFeatured(12, "directory").catch(() => []),
           listCategories().catch(() => []),
           listByType("directory", 200).catch(() => [])
         ]);
@@ -40,8 +40,7 @@ export default function Directories() {
         const catMap = {};
         (cats || []).forEach(c => { catMap[c.id] = c.name; });
         setCatsMap(catMap);
-        const featsDirs = (feats || []).filter(f => (f.type || "").toLowerCase() === "directory");
-        setFeatured(featsDirs.slice(0, 12));
+        setFeatured(feats.slice(0,12));
         setDirs(list || []);
       } catch (err) {
         console.error("Failed to load directories", err);

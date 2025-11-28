@@ -80,14 +80,14 @@ export default function Register() {
           >
            Continue with Google
           </button>
-          <button
+    {/*  <button
             className="social-btn"
             type="button"
             onClick={handleFacebook}
             disabled={busy}
           >
             Continue with Facebook
-          </button>
+          </button> */}
         </div>
         <hr className="auth-divider" />
            <h3 className="auth-title-2">Or Register with Email</h3>

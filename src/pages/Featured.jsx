@@ -1,7 +1,7 @@
 // src/pages/Featured.jsx
 // Changes:
-// - Load categories and map category IDs to names so Featured cards show category NAMES (not IDs).
-// - Keep featured list capped at 12.
+// - Use listFeatured to fetch ALL featured posts excluding directories, then paginate the grid (12 per page).
+// - Removed the previous simplistic slice/filter; added proper pagination controls.
 
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -16,6 +16,10 @@ export default function Featured() {
   const [loading, setLoading] = useState(true);
   const visibleCount = getVisibleCountForViewport();
 
+  // Pagination
+  const PAGE_SIZE = 12;
+  const [page, setPage] = useState(1);
+
   useEffect(() => {
     let mounted = true;
     async function load() {
@@ -23,13 +27,15 @@ export default function Featured() {
       try {
         const [cats, featured] = await Promise.all([
           listCategories().catch(() => []),
-          listFeatured(12).catch(() => [])
+          // Load a larger number of non-directory featured items so we can paginate on the client
+          listFeatured(1000, null, "directory").catch(() => [])
         ]);
         if (!mounted) return;
         const map = {};
         (cats || []).forEach(c => { map[c.id] = c.name; });
         setCatsMap(map);
-        setItems((featured || []).slice(0, 12));
+
+        setItems(featured || []);
       } catch (err) {
         console.error("Failed to load featured items", err);
         if (!mounted) return;
@@ -63,6 +69,18 @@ export default function Featured() {
     );
   }
 
+  // Pagination helpers
+  const total = items.length;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const start = (page - 1) * PAGE_SIZE;
+  const pageItems = items.slice(start, start + PAGE_SIZE);
+
+  useEffect(() => {
+    // if items change reset page if out of range
+    if (page > totalPages) setPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [total]);
+
   return (
     <div className="main-content">
       <div className="promo-box">
@@ -78,10 +96,19 @@ export default function Featured() {
           <div className="flex-card-grid" role="list">
             {loading && <div style={{ padding: 12 }}>Loading…</div>}
             {!loading && (!items || items.length === 0) && <div style={{ padding: 12 }}>No featured items yet.</div>}
-            {!loading && (items || []).slice(0,12).map(renderCard)}
+            {!loading && pageItems.map(renderCard)}
           </div>
         </div>
       </div>
+
+      {/* Pagination controls */}
+      {!loading && items.length > PAGE_SIZE && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 8, marginTop: 12 }}>
+          <button className="see-all-link" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page <= 1}>Prev</button>
+          <div style={{ padding: "6px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 6 }}>{page} / {totalPages} ({total})</div>
+          <button className="see-all-link" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>Next</button>
+        </div>
+      )}
     </div>
   );
 }

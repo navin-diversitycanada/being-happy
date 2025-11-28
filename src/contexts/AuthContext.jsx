@@ -197,7 +197,7 @@ export function AuthProvider({ children }) {
 
       // Send verification email (best-effort)
       try {
-        const defaultContinue = (typeof window !== "undefined") ? `${window.location.origin}/login` : "https://being-happy-pwa.web.app/login";
+        const defaultContinue = (typeof window !== "undefined") ? `${window.location.origin}/login` : "https://beinghappy.goldenvoices.com/login";
         const actionCodeSettings = { url: defaultContinue, handleCodeInApp: true };
         await sendEmailVerification(cred.user, actionCodeSettings);
       } catch (sendErr) {
@@ -368,7 +368,7 @@ export function AuthProvider({ children }) {
     if (!navigator.onLine) throw new Error("Online connection required to reset password.");
     if (!email) throw new Error("Enter an email address.");
 
-    const defaultContinue = (typeof window !== "undefined") ? `${window.location.origin}/login` : "https://being-happy-pwa.web.app/login";
+    const defaultContinue = (typeof window !== "undefined") ? `${window.location.origin}/login` : "https://beinghappy.goldenvoices.com/login";
     const actionCodeSettings = { url: defaultContinue, handleCodeInApp: true };
 
     try {

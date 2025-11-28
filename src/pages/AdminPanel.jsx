@@ -1,12 +1,8 @@
 // src/pages/AdminPanel.jsx
-// Admin Panel — full file
-// Changes in this version:
-// - Removed code-block insertion option from the WYSIWYG editor (no code insertion).
-// - Reordered toolbar buttons to: Bold, Italic, Underline, Strikethrough (S struck), H2, H3,
-//   Pointed List, Numbered List, Line, Link.
-// - Adjusted toolbar to be responsive (flex-wrap) so buttons flow to next line on small screens.
-// - Kept sanitizeHtml allowing H2/H3/UL/OL/LI/P/BR/PRE/CODE/HR/B/I/U/S/A[href]; already strips attributes.
-// - No other behavioral changes.
+// Admin Panel — updates:
+// - Parent selects sorted A–Z for countries and "Country -> Province" options sorted by country then province.
+// - Expand/Collapse buttons for locations use purple background.
+// - Post title in All Posts listing gets dedicated class so it renders white.
 
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
@@ -15,6 +11,7 @@ import ImageUploader from "../components/PostFormFields/ImageUploader";
 import Breadcrumbs from "../components/Breadcrumbs";
 import { listCategories as apiListCategories, createCategory, updateCategory, deleteCategory } from "../api/categories";
 import { createPost, updatePost, getPost, listAllForAdmin, deletePost } from "../api/posts";
+import { listLocationsTree, listLocations, createLocation, updateLocation, deleteLocation } from "../api/locations";
 
 // Firestore SDK (modular)
 import { getFirestore, doc, getDoc, setDoc, updateDoc, collection, getDocs } from "firebase/firestore";
@@ -47,50 +44,34 @@ function extractYouTubeId(input) {
 }
 
 /* ======= Sanitizer helper (keeps H2/H3 allowed) ======= */
-/**
- * sanitizeHtml
- * - DOM based sanitizer that:
- *   * allows a conservative whitelist of tags:
- *     p, br, b/strong, i/em, u, s/strike, h2, h3, ul, ol, li, pre, code, hr, a[href]
- *   * strips ALL attributes except href on <a> (and ensures href is not javascript: or data:)
- *   * removes style/class/other attributes
- * - Returns sanitized innerHTML (string).
- */
 function sanitizeHtml(html) {
   if (!html || typeof html !== "string") return "";
   try {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, "text/html");
 
-    // Allowed tags set (upper-case tagName)
     const allowed = new Set([
       "A", "P", "BR", "B", "STRONG", "I", "EM", "U", "S", "STRIKE",
       "H2", "H3", "UL", "OL", "LI", "PRE", "CODE", "HR"
     ]);
 
-    // Walk all elements and clean or unwrap
     const all = Array.from(doc.body.querySelectorAll("*"));
     for (const node of all) {
       const tn = node.tagName.toUpperCase();
       if (!allowed.has(tn)) {
-        // unwrap node: move children before node, then remove node
         const parent = node.parentNode;
         while (node.firstChild) parent.insertBefore(node.firstChild, node);
         parent.removeChild(node);
         continue;
       }
 
-      // For allowed tags, strip attributes except href on <a>
       for (const attr of Array.from(node.attributes)) {
         if (tn === "A" && attr.name === "href") {
-          // keep href but sanitize javascript: and data: URIs
           try {
             const href = (attr.value || "").trim();
             const lower = href.toLowerCase();
             if (lower.startsWith("javascript:") || lower.startsWith("data:")) {
               node.removeAttribute(attr.name);
-            } else {
-              // keep href
             }
           } catch (e) {
             node.removeAttribute(attr.name);
@@ -100,12 +81,10 @@ function sanitizeHtml(html) {
         }
       }
 
-      // Defensive: ensure style/class removed
       if (node.style) node.removeAttribute("style");
       node.removeAttribute("class");
     }
 
-    // Clean up empty font tags if any slipped through (defensive)
     doc.querySelectorAll("font").forEach(font => {
       while (font.firstChild) font.parentNode.insertBefore(font.firstChild, font);
       font.parentNode.removeChild(font);
@@ -134,21 +113,32 @@ export default function AdminPanel() {
 
   const hasFirestore = true;
   const workerUrl = process.env.REACT_APP_UPLOAD_WORKER_URL || null;
-  // default upload key for testing/local (will be null in production if not provided)
-  const uploadKeyEnv = process.env.REACT_APP_UPLOAD_KEY || null;
 
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState([]);
-  // categories now store immutable flag
   const [categories, setCategories] = useState([]);
   const [usersList, setUsersList] = useState([]);
   const [activeSection, setActiveSection] = useState("posts");
   const [editingPostId, setEditingPostId] = useState(null);
   const [editingCategoryId, setEditingCategoryId] = useState(null);
 
+  // Locations state
+  const [locationsTree, setLocationsTree] = useState([]);
+  const [locationsFlat, setLocationsFlat] = useState([]);
+  const [editingLocationId, setEditingLocationId] = useState(null);
+  const [editingLocationHasChildren, setEditingLocationHasChildren] = useState(false);
+  const [locationFormName, setLocationFormName] = useState("");
+  const [locationFormType, setLocationFormType] = useState("country");
+  const [locationFormParent, setLocationFormParent] = useState("");
+
+  // Expand/collapse state (only one expanded country/province at a time)
+  const [expandedCountryId, setExpandedCountryId] = useState(null);
+  const [expandedProvinceId, setExpandedProvinceId] = useState(null);
+
   const wysiwygRef = useRef(null);
   const listingsTopRef = useRef(null);
   const categoryInputRef = useRef(null);
+  const locationFormRef = useRef(null);
   const postFormRef = useRef(null);
 
   const [postForm, setPostForm] = useState({
@@ -160,19 +150,22 @@ export default function AdminPanel() {
     thumbnailUrl: "",
     youtubeInput: "",
     published: false,
-    featured: false
+    featured: false,
+    // location ids for directory
+    locationCountryId: null,
+    locationProvinceId: null,
+    locationCityId: null
   });
 
   const [categoryFormName, setCategoryFormName] = useState("");
   const [fieldMessages, setFieldMessages] = useState({ general: "", post: "", category: "", upload: "", youtube: "", users: "" });
   const [saving, setSaving] = useState(false);
 
-  // Listing state: pagination + search + type filter for posts
+  // Listing state
   const [postPage, setPostPage] = useState(1);
   const [postQuery, setPostQuery] = useState("");
-  const [postTypeFilter, setPostTypeFilter] = useState("all"); // all / article / video / audio / directory
+  const [postTypeFilter, setPostTypeFilter] = useState("all");
 
-  // Featured tab search/filter (separate state so posts list and featured can be independently searched)
   const [featuredQuery, setFeaturedQuery] = useState("");
   const [featuredTypeFilter, setFeaturedTypeFilter] = useState("all");
 
@@ -234,14 +227,19 @@ export default function AdminPanel() {
     async function loadAll() {
       setLoading(true);
       try {
-        // Ensure type categories exist before loading the rest
         await ensureTypeCategories();
 
-        const [allPosts, cats] = await Promise.all([listAllForAdmin(1000), apiListCategories()]);
+        const [allPosts, cats, locTree, locFlat] = await Promise.all([
+          listAllForAdmin(1000),
+          apiListCategories(),
+          listLocationsTree().catch(() => []),
+          listLocations().catch(() => [])
+        ]);
         if (cancelled) return;
         setPosts(allPosts || []);
-        // store immutable flag so we can filter them out in the UI
         setCategories((cats || []).map(c => ({ id: c.id, name: c.name, immutable: !!c.immutable })));
+        setLocationsTree(locTree || []);
+        setLocationsFlat(locFlat || []);
       } catch (err) {
         console.error("Admin load error", err);
         setFieldMessages((p) => ({ ...p, general: "Failed to load admin data" }));
@@ -286,7 +284,6 @@ export default function AdminPanel() {
     return () => { cancelled = true; };
   }, [activeSection, isAdmin, db]);
 
-  // Clear admin fieldMessages when switching sections so messages don't persist across tabs
   useEffect(() => {
     setFieldMessages({ general: "", post: "", category: "", upload: "", youtube: "", users: "" });
   }, [activeSection]);
@@ -313,7 +310,10 @@ export default function AdminPanel() {
       thumbnailUrl: "",
       youtubeInput: "",
       published: false,
-      featured: false
+      featured: false,
+      locationCountryId: null,
+      locationProvinceId: null,
+      locationCityId: null
     });
     setCategoryFormName("");
     setEditingCategoryId(null);
@@ -332,18 +332,15 @@ export default function AdminPanel() {
     const cats = postForm.categories || [];
     const desc = (postForm.descHTML || "").trim();
     if (!ty) return "Type is required.";
-    if (ty.toLowerCase() !== "directory") { // directories don't require title or description? keep title required
+    if (ty.toLowerCase() !== "directory") {
       if (!t) return "Title is required.";
       if (!desc) return "Description is required.";
     } else {
-      // For directories still require title (keeps behavior consistent)
       if (!t) return "Title is required.";
     }
-    // YouTube required for Video and Audio (Meditation)
     if (ty === "Video" || ty === "Audio") {
       if (!postForm.youtubeInput || !extractYouTubeId(postForm.youtubeInput)) return "YouTube URL/ID is required and must be valid for Video/Audio types.";
     }
-    // categories required for non-directory posts (keep existing behavior)
     if (ty.toLowerCase() !== "directory" && (!cats || !cats.length)) return "At least one category is required.";
     return null;
   }
@@ -378,6 +375,30 @@ export default function AdminPanel() {
     const uniqueCats = Array.from(new Set(postForm.categories || []));
     const youtubeId = (postForm.type === "Video" || postForm.type === "Audio") ? extractYouTubeId(postForm.youtubeInput || "") : (postForm.youtubeInput ? extractYouTubeId(postForm.youtubeInput || "") : null);
 
+    let locationPayload = null;
+    if ((postForm.type || "").toLowerCase() === "directory") {
+      const countryId = postForm.locationCountryId || null;
+      const provinceId = postForm.locationProvinceId || null;
+      const cityId = postForm.locationCityId || null;
+      const findName = (lid) => {
+        const found = (locationsFlat || []).find(x => x.id === lid);
+        return found ? found.name : null;
+      };
+
+      if (countryId || provinceId || cityId) {
+        locationPayload = {
+          countryId: countryId || null,
+          countryName: findName(countryId) || null,
+          provinceId: provinceId || null,
+          provinceName: findName(provinceId) || null,
+          cityId: cityId || null,
+          cityName: findName(cityId) || null
+        };
+      } else {
+        locationPayload = null;
+      }
+    }
+
     const payload = {
       title: postForm.title.trim(),
       type: postForm.type.toLowerCase(),
@@ -391,7 +412,8 @@ export default function AdminPanel() {
       published: !!postForm.published,
       featured: !!postForm.featured,
       createdBy: currentUser ? currentUser.uid : null,
-      publishedAt: postForm.published ? new Date() : null
+      publishedAt: postForm.published ? new Date() : null,
+      location: locationPayload
     };
 
     try {
@@ -433,7 +455,10 @@ export default function AdminPanel() {
         thumbnailUrl: p.thumbnailUrl || "",
         youtubeInput: p.youtubeId || "",
         published: !!p.published,
-        featured: !!p.featured
+        featured: !!p.featured,
+        locationCountryId: (p.location && p.location.countryId) || null,
+        locationProvinceId: (p.location && p.location.provinceId) || null,
+        locationCityId: (p.location && p.location.cityId) || null
       });
       setActiveSection("posts");
       setFieldMessages(m => ({ ...m, post: "" }));
@@ -460,7 +485,6 @@ export default function AdminPanel() {
       await deletePost(id);
       const refreshed = await listAllForAdmin(1000);
       setPosts(refreshed || []);
-      // Use only one place to display the deletion message (removed top-level duplicate render)
       setFieldMessages(m => ({ ...m, general: "Post deleted." }));
       if (editingPostId === id) resetPostForm();
     } catch (err) {
@@ -485,7 +509,6 @@ export default function AdminPanel() {
   }
 
   async function handleUploaded(result) {
-    // Only allow attaching uploaded image when online
     if (!isOnline) {
       setFieldMessages(p => ({ ...p, upload: "You are offline — cannot attach uploaded image." }));
       return;
@@ -513,7 +536,7 @@ export default function AdminPanel() {
     }
   }
 
-  /* CATEGORY CRUD */
+  /* CATEGORY CRUD (unchanged) */
   async function handleAddCategory(e) {
     e?.preventDefault?.();
     if (!isOnline) { setFieldMessages(p => ({ ...p, category: "You are offline — cannot create categories." })); return; }
@@ -579,7 +602,6 @@ export default function AdminPanel() {
         return;
       }
       await deleteCategory(id);
-      // update posts to remove category
       const affected = posts.filter(p => (p.categories || []).includes(id));
       await Promise.all(affected.map(async (p) => {
         const filtered = (p.categories || []).filter(cid => cid !== id);
@@ -626,13 +648,11 @@ export default function AdminPanel() {
       const ref = doc(db, "users", uid);
       await updateDoc(ref, { role: newRole, updatedAt: new Date() });
       setUsersList(prev => prev.map(u => (u.id === uid ? { ...u, role: newRole } : u)));
-      // Use friendly name/email in feedback
       const usr = usersList.find(u => u.id === uid);
       const who = usr ? (usr.displayName || usr.email || uid) : uid;
       setFieldMessages(p => ({ ...p, users: `Updated role for ${who}` }));
     } catch (err) {
       console.error("Failed to update user role", err);
-      // Permission denied likely if rules don't allow — surface a helpful message
       if (err && err.code === "permission-denied") {
         setFieldMessages(p => ({ ...p, users: "Permission denied. Make sure your Firestore rules allow admins to update user roles." }));
       } else {
@@ -643,7 +663,6 @@ export default function AdminPanel() {
     }
   }
 
-  // New: disable user by setting users/{uid}.disabled = true
   async function handleDisableUser(uid) {
     if (!isAdmin) {
       setFieldMessages(p => ({ ...p, users: "Only admins can perform this action." }));
@@ -657,7 +676,6 @@ export default function AdminPanel() {
       setUpdatingUserId(uid);
       const ref = doc(db, "users", uid);
       await updateDoc(ref, { disabled: true, updatedAt: new Date() });
-      // update local list to reflect flag immediately
       setUsersList(prev => prev.map(u => (u.id === uid ? { ...u, _raw: { ...u._raw, disabled: true }, role: u.role } : u)));
       const usr = usersList.find(u => u.id === uid);
       const who = usr ? (usr.displayName || usr.email || uid) : uid;
@@ -667,7 +685,6 @@ export default function AdminPanel() {
       if (err && err.code === "permission-denied") {
         setFieldMessages(p => ({ ...p, users: "Permission denied. Make sure your Firestore rules allow admins to update user records." }));
       } else {
-        // admin gets full details; others will see friendly message elsewhere
         setFieldMessages(p => ({ ...p, users: `Failed to disable user: ${err?.message || err}` }));
       }
     } finally {
@@ -675,7 +692,6 @@ export default function AdminPanel() {
     }
   }
 
-  // New: enable user by clearing users/{uid}.disabled (set to false)
   async function handleEnableUser(uid) {
     if (!isAdmin) {
       setFieldMessages(p => ({ ...p, users: "Only admins can perform this action." }));
@@ -728,12 +744,10 @@ export default function AdminPanel() {
     };
   }
 
-  // ---- User action stubs (Reset password) ----
   async function handleResetPassword(uid) {
     if (!isAdmin) { setFieldMessages(p => ({ ...p, users: "Only admins can perform this action." })); return; }
     if (!uid) return;
     if (!isOnline) { setFieldMessages(p => ({ ...p, users: "You are offline — cannot send reset emails." })); return; }
-    // find user email from usersList
     const userEntry = usersList.find(u => u.id === uid);
     const targetEmail = userEntry?.email;
     if (!targetEmail) {
@@ -744,27 +758,20 @@ export default function AdminPanel() {
 
     try {
       setFieldMessages(p => ({ ...p, users: "" }));
-
-      // Use app origin as continue URL (landing to login)
-      const continueUrl = (typeof window !== "undefined") ? `${window.location.origin}/login` : "https://being-happy-pwa.web.app/login";
+      const continueUrl = (typeof window !== "undefined") ? `${window.location.origin}/login` : "https://beinghappy.goldenvoices.com/login";
 
       try {
-        // Primary attempt: client SDK
         await sendPasswordResetEmail(auth, targetEmail, { url: continueUrl, handleCodeInApp: true });
         setFieldMessages(p => ({ ...p, users: `Password reset email sent to ${targetEmail}` }));
         return;
       } catch (sdkErr) {
         console.error("sendPasswordResetEmail failed:", sdkErr);
-
-        // Specific fallback: if SDK complains about recaptcha/internal, try REST endpoint using apiKey
-        // This fallback uses the Identity Toolkit sendOobCode endpoint.
         const apiKey = (firebaseConfig && firebaseConfig.apiKey) || null;
         if (!apiKey) {
           setFieldMessages(p => ({ ...p, users: "Failed to send reset email (no API key). See console for details." }));
           return;
         }
 
-        // Attempt REST fallback
         try {
           const restUrl = `https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${encodeURIComponent(apiKey)}`;
           const body = {
@@ -799,9 +806,157 @@ export default function AdminPanel() {
     }
   }
 
-  // ---- Render helpers ----
+  // ---- Locations CRUD + helpers ----
+  async function loadLocations() {
+    try {
+      const tree = await listLocationsTree().catch(() => []);
+      const flat = await listLocations().catch(() => []);
+      setLocationsTree(tree || []);
+      setLocationsFlat(flat || []);
+    } catch (err) {
+      console.error("Failed to load locations", err);
+      setLocationsTree([]);
+      setLocationsFlat([]);
+    }
+  }
+
+  useEffect(() => {
+    loadLocations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Called when clicking "Edit" in locations list — now scrolls to the Add/Edit Location area
+  function startEditLocation(loc) {
+    setEditingLocationId(loc.id);
+    setLocationFormName(loc.name || "");
+    setLocationFormType(loc.type || "country");
+    setLocationFormParent(loc.parentId || "");
+    // compute whether this location has children
+    const hasChildren = (locationsFlat || []).some(l => l.parentId === loc.id);
+    setEditingLocationHasChildren(!!hasChildren);
+
+    // Switch to the Locations tab and scroll to the location form
+    setActiveSection("locations");
+    setTimeout(() => {
+      const el = locationFormRef.current || document.querySelector('.admin-panel input[placeholder="Location name"]');
+      if (el) { el.focus(); el.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    }, 180);
+  }
+
+  async function handleAddOrUpdateLocation(e) {
+    e?.preventDefault?.();
+    if (!isAdmin) return setFieldMessages(p => ({ ...p, general: "Only admins can manage locations." }));
+    if (!isOnline) return setFieldMessages(p => ({ ...p, general: "You are offline — cannot change locations." }));
+    const name = (locationFormName || "").trim();
+    const type = (locationFormType || "country").toLowerCase();
+    const parentId = locationFormParent || null;
+    if (!name) return setFieldMessages(p => ({ ...p, general: "Enter location name." }));
+
+    // Client-side validation: parent requirements
+    if (type === "province" && !parentId) {
+      return setFieldMessages(p => ({ ...p, general: "A province must have a parent country." }));
+    }
+    if (type === "city" && !parentId) {
+      return setFieldMessages(p => ({ ...p, general: "A city must have a parent province." }));
+    }
+
+    // uniqueness: name + parent must be unique (allow same name under different parents)
+    const nameLower = name.toLowerCase();
+    const duplicate = (locationsFlat || []).find(l => {
+      const sameName = (l.name || "").trim().toLowerCase() === nameLower;
+      const sameParent = ((l.parentId || "") === (parentId || ""));
+      if (!editingLocationId) {
+        return sameName && sameParent;
+      } else {
+        return sameName && sameParent && l.id !== editingLocationId;
+      }
+    });
+    if (duplicate) {
+      return setFieldMessages(p => ({ ...p, general: "A location with this name already exists under the selected parent." }));
+    }
+
+    // When editing: prevent changing type if this location has children.
+    if (editingLocationId) {
+      const current = (locationsFlat || []).find(l => l.id === editingLocationId) || {};
+      const currentType = (current.type || "").toLowerCase();
+      const requestedType = type;
+      if (currentType !== requestedType) {
+        const hasChildren = (locationsFlat || []).some(l => l.parentId === editingLocationId);
+        if (hasChildren) {
+          return setFieldMessages(p => ({ ...p, general: "Cannot change type while this location has child locations. Reparent or remove children first." }));
+        }
+      }
+    }
+
+    try {
+      if (editingLocationId) {
+        await updateLocation(editingLocationId, { name, parentId, type });
+        setFieldMessages(p => ({ ...p, general: "Location updated." }));
+      } else {
+        await createLocation({ name, type, parentId });
+        setFieldMessages(p => ({ ...p, general: "Location created." }));
+      }
+      await loadLocations();
+      setEditingLocationId(null);
+      setEditingLocationHasChildren(false);
+      setLocationFormName("");
+      setLocationFormParent("");
+      setLocationFormType("country");
+    } catch (err) {
+      console.error("Location save failed", err);
+      // Show helpful message from server if available
+      setFieldMessages(p => ({ ...p, general: err.message || "Failed to save location" }));
+    }
+  }
+
+  async function handleDeleteLocation(id) {
+    if (!window.confirm("Delete location? This will remove the location and adjust any posts that reference it.")) return;
+    if (!isOnline) { setFieldMessages(p => ({ ...p, general: "You are offline — cannot delete locations." })); return; }
+    try {
+      await deleteLocation(id);
+      setFieldMessages(p => ({ ...p, general: "Location deleted." }));
+      await loadLocations();
+      const refreshed = await listAllForAdmin(1000);
+      setPosts(refreshed || []);
+    } catch (err) {
+      console.error("Failed to delete location", err);
+      setFieldMessages(p => ({ ...p, general: err.message || "Delete failed" }));
+    }
+  }
+
+  // Helper: check whether any posts reference the provided location id (country/province/city)
+  function hasPostsForLocation(locationId) {
+    if (!locationId || !posts || !posts.length) return false;
+    return posts.some(p => {
+      const L = p.location || {};
+      return L.countryId === locationId || L.provinceId === locationId || L.cityId === locationId;
+    });
+  }
+
+  // Expand / collapse handlers
+  function toggleCountryExpand(countryId) {
+    if (expandedCountryId === countryId) {
+      setExpandedCountryId(null);
+      setExpandedProvinceId(null);
+    } else {
+      setExpandedCountryId(countryId);
+      setExpandedProvinceId(null);
+    }
+  }
+
+  function toggleProvinceExpand(provinceId, parentCountryId) {
+    // if parent country isn't expanded, expand it
+    if (expandedCountryId !== parentCountryId) {
+      setExpandedCountryId(parentCountryId);
+    }
+    if (expandedProvinceId === provinceId) {
+      setExpandedProvinceId(null);
+    } else {
+      setExpandedProvinceId(provinceId);
+    }
+  }
+
   function renderPostsList() {
-    // apply type filter first
     const filteredByType = postTypeFilter === "all" ? posts : posts.filter(p => (p.type || "").toLowerCase() === postTypeFilter);
     const { total, pages, items } = filterAndPage(filteredByType, postQuery, postPage);
 
@@ -830,10 +985,18 @@ export default function AdminPanel() {
                 <div className="admin-row-left" style={{ minWidth: 0 }}>
                   <img src={p.thumbnailUrl || p.imageUrl || "/images/placeholder.png"} alt="" className="item-thumb" />
                   <div style={{ minWidth: 0 }}>
-                    <div className="detail-title" style={{ fontSize: 16 }}>{p.title}</div>
+                    <div className="detail-title admin-list-post-title" style={{ fontSize: 16 }}>{p.title}</div>
                     <div className="muted" style={{ fontSize: 13, marginTop: 6 }}>
                       {displayType(p.type)}{(p.categories || []).length ? ` • ${(p.categories || []).map(cid => (categories.find(c => c.id === cid) || {}).name || cid).join(", ")}` : ""}
                     </div>
+
+                    {/* Locations line for posts (cream color, same font family/size as muted) */}
+                    {p.location && (
+                      <div style={{ color: "var(--cream)", fontSize: 13, marginTop: 6 }}>
+                        { [p.location.countryName, p.location.provinceName, p.location.cityName].filter(Boolean).join(", ") }
+                      </div>
+                    )}
+
                   </div>
                 </div>
 
@@ -863,8 +1026,8 @@ export default function AdminPanel() {
     );
   }
 
-  function renderCategoriesList() {
-    // hide immutable/system type categories from the Existing Categories view
+  // --- Categories tab (listing first, add/edit later)
+  function renderCategoriesTab() {
     const visibleCats = (categories || []).filter(c => !c.immutable);
     const { total, pages, items } = filterAndPage(visibleCats, categoryQuery, categoryPage);
 
@@ -897,6 +1060,239 @@ export default function AdminPanel() {
           <div style={{ padding: "6px 10px", background: "rgba(255,255,255,0.03)", borderRadius: 6 }}>{categoryPage} / {pages} ({total})</div>
           <button className="see-all-link" onClick={() => setCategoryPage(p => Math.min(pages, p + 1))} disabled={categoryPage >= pages}>Next</button>
         </div>
+
+        <hr style={{ margin: "18px 0", borderColor: "rgba(255,255,255,0.04)" }} />
+
+        {/* Add / Edit Category (comes after listing in this tab) */}
+        <h3 className="carousel-title">{editingCategoryId ? "Edit Category" : "Add Category"}</h3>
+
+        <div className="mt-12">
+          <input ref={categoryInputRef} className="text-input" placeholder="Category name" value={categoryFormName} onChange={(e) => { setCategoryFormName(e.target.value); setFieldMessages((p) => ({ ...p, category: "" })); }} />
+          <div style={{ marginTop: 8 }}>
+            {editingCategoryId ? (
+              <>
+                <button className="account-action-btn" onClick={saveEditCategory} disabled={!isOnline || !isAdmin}>Save</button>
+                <button className="see-all-link" onClick={() => { setEditingCategoryId(null); setCategoryFormName(""); }}>Cancel</button>
+              </>
+            ) : (
+              <button className="account-action-btn" onClick={handleAddCategory} disabled={!isOnline || !isAdmin}>Add Category</button>
+            )}
+          </div>
+        </div>
+
+        {fieldMessages.category && <div className={`account-message ${fieldMessages.category.includes("created") || fieldMessages.category.includes("updated") ? "success-text" : "error-text"} mt-12`}>{fieldMessages.category}</div>}
+      </div>
+    );
+  }
+
+  // --- Locations tab (Add/Edit first, listing after)
+  function renderLocationsTab() {
+    // Helper: render parent select label for cities (Country -> Province)
+    // Build provinces array with country name and province name then sort by country then province
+    const provinceDisplayOptions = (locationsFlat || [])
+      .filter(l => l.type === "province")
+      .map(p => {
+        const country = (locationsFlat || []).find(c => c.id === p.parentId);
+        const countryName = country ? country.name : "(no country)";
+        return { id: p.id, countryName, provinceName: p.name, label: `${countryName} -> ${p.name}` };
+      })
+      .sort((a, b) => {
+        const c = a.countryName.localeCompare(b.countryName);
+        if (c !== 0) return c;
+        return a.provinceName.localeCompare(b.provinceName);
+      });
+
+    // Countries sorted A–Z
+    const countryOptions = (locationsFlat || [])
+      .filter(l => l.type === "country")
+      .map(c => ({ id: c.id, name: c.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const provinceOptionsForParent = (locationsFlat || []).filter(l => l.type === "province").map(p => ({ id: p.id, name: p.name, parentId: p.parentId }));
+
+    return (
+      <div>
+        {/* Add / Edit Location section — placed at the top of Locations tab */}
+        <div style={{ marginTop: 6 }}>
+          <h3 className="carousel-title">{editingLocationId ? "Edit Location" : "Add Location"}</h3>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12, flexWrap: "wrap" }}>
+            <select className="text-input" value={locationFormType} onChange={(e) => { setLocationFormType(e.target.value); setLocationFormParent(""); }}>
+              <option value="country">Country</option>
+              <option value="province">Province</option>
+              <option value="city">City</option>
+            </select>
+
+            <input
+              ref={locationFormRef}
+              className="text-input"
+              placeholder="Location name"
+              value={locationFormName}
+              onChange={(e) => setLocationFormName(e.target.value)}
+            />
+
+            <select className="text-input" value={locationFormParent || ""} onChange={(e) => setLocationFormParent(e.target.value)}>
+              <option value="">Parent (None)</option>
+
+              {/* If adding a province, show countries as parents (sorted) */}
+              {locationFormType === "province" && countryOptions.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+
+              {/* If adding a city, show provinces labeled "Country -> Province" (sorted by country then province) */}
+              {locationFormType === "city" && provinceDisplayOptions.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+            </select>
+
+            <button className="account-action-btn" onClick={handleAddOrUpdateLocation} disabled={!isOnline || !isAdmin}>
+              {editingLocationId ? "Save Location" : "Add Location"}
+            </button>
+
+            {editingLocationId && <button className="see-all-link" onClick={() => {
+              setEditingLocationId(null);
+              setEditingLocationHasChildren(false);
+              setLocationFormName("");
+              setLocationFormParent("");
+              setLocationFormType("country");
+            }}>Cancel</button>}
+          </div>
+
+          {/* Inline notes / validation hints */}
+          <div style={{ marginTop: 8 }}>
+           
+            {editingLocationId && editingLocationHasChildren && (
+              <div className="account-message error-text" style={{ marginTop: 8 }}>
+                
+              </div>
+            )}
+          </div>
+        </div>
+
+        <hr style={{ margin: "18px 0", borderColor: "rgba(255,255,255,0.04)" }} />
+
+        {/* Existing Locations list */}
+        <div style={{ marginTop: 6 }}>
+          <h3 className="carousel-title">Existing Locations</h3>
+          {fieldMessages.general && <div className="account-message success-text" style={{ marginTop: 12 }}>{fieldMessages.general}</div>}
+
+          <div className="admin-list mt-12">
+            {loading ? <div className="muted">Loading…</div> : (
+              <>
+                {locationsTree.length === 0 && <div className="muted">No locations defined.</div>}
+                {locationsTree.map(country => {
+                  const countryHasChildren = country.children && country.children.length > 0;
+                  const countryExpanded = expandedCountryId === country.id;
+                  return (
+                    <div key={country.id} style={{ marginBottom: 12 }}>
+                      <div className="admin-row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                        <div className="admin-row-left" style={{ gap: 12 }}>
+                          {/* Expand/Collapse button if country has children */}
+                          {countryHasChildren ? (
+                            <button
+                              aria-expanded={countryExpanded}
+                              aria-controls={`country-${country.id}-children`}
+                              onClick={() => toggleCountryExpand(country.id)}
+                              style={{
+                                background: "var(--purple)",
+                                color: "var(--cream)",
+                                border: "none",
+                                borderRadius: 6,
+                                padding: "4px 8px",
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                marginRight: 6
+                              }}
+                              title={countryExpanded ? "Collapse" : "Expand"}
+                            >
+                              {countryExpanded ? "−" : "+"}
+                            </button>
+                          ) : <span style={{ width: 28 }} />}
+
+                          <div style={{ fontWeight: 700 }}>{country.name} <span style={{ fontSize: 13, color: "#f5e9de", marginLeft: 8, textTransform:"capitalize"  }}>({country.type})</span></div>
+                        </div>
+                        <div className="admin-row-actions">
+                         
+                          {/* Show View Posts only when posts reference this location */}
+                          {hasPostsForLocation(country.id) && (
+                            <button className="see-all-link" onClick={() => window.open(`/location/${country.id}`, "_blank")}>View posts</button>
+                          )}
+                           <button className="see-all-link" onClick={() => startEditLocation(country)}>Edit</button>
+                          <button className="account-action-btn" onClick={() => handleDeleteLocation(country.id)} disabled={!isOnline || !isAdmin}>Delete</button>
+                        </div>
+                      </div>
+
+                      {/* provinces: only show when country expanded */}
+                      {countryExpanded && country.children && country.children.length > 0 && (
+                        <div id={`country-${country.id}-children`} style={{ marginLeft: 22, marginTop: 8 }}>
+                          {country.children.map(prov => {
+                            const provHasChildren = prov.children && prov.children.length > 0;
+                            const provExpanded = expandedProvinceId === prov.id;
+                            return (
+                              <div key={prov.id} style={{ marginBottom: 8 }}>
+                                <div className="admin-row" style={{ alignItems: "center", justifyContent: "space-between" }}>
+                                  <div className="admin-row-left" style={{ gap: 12 }}>
+                                    {provHasChildren ? (
+                                      <button
+                                        aria-expanded={provExpanded}
+                                        aria-controls={`prov-${prov.id}-children`}
+                                        onClick={() => toggleProvinceExpand(prov.id, country.id)}
+                                        style={{
+                                          background: "var(--purple)",
+                                          color: "var(--cream)",
+                                          border: "none",
+                                          borderRadius: 6,
+                                          padding: "4px 8px",
+                                          fontWeight: 700,
+                                          cursor: "pointer",
+                                          marginRight: 6
+                                        }}
+                                        title={provExpanded ? "Collapse" : "Expand"}
+                                      >
+                                        {provExpanded ? "−" : "+"}
+                                      </button>
+                                    ) : <span style={{ width: 28 }} />}
+
+                                    <div style={{ fontWeight: 700 }}>{prov.name} <span style={{ fontSize: 13, color: "#f5e9de", marginLeft: 8,textTransform:"capitalize"  }}>({prov.type})</span></div>
+                                  </div>
+                                  <div className="admin-row-actions">
+                                  
+                                    {hasPostsForLocation(prov.id) && (
+                                      <button className="see-all-link" onClick={() => window.open(`/location/${prov.id}`, "_blank")}>View posts</button>
+                                    )}
+                                      <button className="see-all-link" onClick={() => startEditLocation(prov)}>Edit</button>
+                                    <button className="account-action-btn" onClick={() => handleDeleteLocation(prov.id)} disabled={!isOnline || !isAdmin}>Delete</button>
+                                  </div>
+                                </div>
+
+                                {/* cities: only show when province expanded */}
+                                {provExpanded && prov.children && prov.children.length > 0 && (
+                                  <div id={`prov-${prov.id}-children`} style={{ marginLeft: 22, marginTop: 6 }}>
+                                    {prov.children.map(city => (
+                                      <div key={city.id} className="admin-row" style={{ alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+                                        <div className="admin-row-left">
+                                          <div style={{ fontWeight: 700 }}>{city.name} <span style={{ fontSize: 13, color: "#f5e9de", marginLeft: 8, textTransform:"capitalize" }}>({city.type})</span></div>
+                                        </div>
+                                        <div className="admin-row-actions">
+                                       
+                                          {hasPostsForLocation(city.id) && (
+                                            <button className="see-all-link" onClick={() => window.open(`/location/${city.id}`, "_blank")}>View posts</button>
+                                          )}
+                                             <button className="see-all-link" onClick={() => startEditLocation(city)}>Edit</button>
+                                          <button className="account-action-btn" onClick={() => handleDeleteLocation(city.id)} disabled={!isOnline || !isAdmin}>Delete</button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
+        </div>
       </div>
     );
   }
@@ -923,7 +1319,6 @@ export default function AdminPanel() {
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 140px auto", gap: 12, alignItems: "center", width: "100%" }}>
                     <div style={{ fontWeight: 700 }}>{u.displayName || "—"}</div>
 
-                    {/* Email column: always show email. If the listed user is an admin, show their uid below the email in cream color */}
                     <div>
                       <div className="muted" style={{ fontSize: 13 }}>{u.email || "—"}</div>
                       { (u.role && u.role.toLowerCase() === "admin") && (
@@ -959,7 +1354,6 @@ export default function AdminPanel() {
 
                       <button className="see-all-link" onClick={() => handleResetPassword(u.id)} disabled={!isOnline || !isAdmin}>Reset Password</button>
 
-                      {/* Enable / Disable button */}
                       {disabled ? (
                         <button className="account-action-btn" disabled={updatingUserId === u.id || !isOnline || !isAdmin} onClick={() => handleEnableUser(u.id)}>
                           {updatingUserId === u.id ? "Updating…" : "Enable User"}
@@ -1005,7 +1399,6 @@ export default function AdminPanel() {
           <div style={{ marginTop: 8 }}><div className="greeting">Admin Panel</div></div>
         </div>
 
-        {/* Offline banner */}
         {!isOnline && (
           <div style={{ marginBottom: 12 }}>
             <div className="account-message error-text">You are offline — all write operations (create/update/delete/upload) are disabled until you reconnect.</div>
@@ -1015,6 +1408,7 @@ export default function AdminPanel() {
         <div className="admin-tabs" role="tablist" aria-label="Admin Sections">
           <button className={`admin-tab-btn ${activeSection === "posts" ? "active" : ""}`} type="button" onClick={() => setActiveSection("posts")}>Posts</button>
           <button className={`admin-tab-btn ${activeSection === "categories" ? "active" : ""}`} type="button" onClick={() => setActiveSection("categories")}>Categories</button>
+          <button className={`admin-tab-btn ${activeSection === "locations" ? "active" : ""}`} type="button" onClick={() => setActiveSection("locations")}>Locations</button>
           <button className={`admin-tab-btn ${activeSection === "featured" ? "active" : ""}`} type="button" onClick={() => setActiveSection("featured")}>Featured</button>
           {isAdmin && (
             <button className={`admin-tab-btn ${activeSection === "users" ? "active" : ""}`} type="button" onClick={() => setActiveSection("users")}>Users</button>
@@ -1047,7 +1441,6 @@ export default function AdminPanel() {
                 onChange={(e) => { if (e.target.value) { addCategoryToPost(e.target.value); e.target.value = ""; } }}
               >
                 <option value="">Add Category</option>
-                {/* exclude immutable/system type categories from the selector */}
                 {categories.filter(c => !c.immutable).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
@@ -1066,7 +1459,6 @@ export default function AdminPanel() {
 
             <label className="form-label">Description (WYSIWYG)</label>
 
-            {/* WYSIWYG toolbar (responsive: wraps on small screens). Order: Bold, Italic, Underline, Strikethrough, H2, H3, Bulleted List, Numbered List, Line, Link */}
             <div
               className="wysiwyg-toolbar"
               style={{ display: "flex", gap: 6, marginBottom: 6, flexWrap: "wrap", alignItems: "center" }}
@@ -1075,19 +1467,11 @@ export default function AdminPanel() {
               <button type="button" className="wys-btn" style={{ minWidth: 44 }} onClick={() => document.execCommand("italic", false, null)}><i>I</i></button>
               <button type="button" className="wys-btn" style={{ minWidth: 44 }} onClick={() => document.execCommand("underline", false, null)}>U</button>
               <button type="button" className="wys-btn" style={{ minWidth: 44 }} onClick={() => document.execCommand("strikeThrough", false, null)} title="Strikethrough"><s>S</s></button>
-
-              {/* Headings */}
               <button type="button" className="wys-btn" style={{ minWidth: 64 }} onClick={() => document.execCommand("formatBlock", false, "h2")}>H2</button>
               <button type="button" className="wys-btn" style={{ minWidth: 64 }} onClick={() => document.execCommand("formatBlock", false, "h3")}>H3</button>
-
-              {/* Lists */}
               <button type="button" className="wys-btn" style={{ minWidth: 64 }} onClick={() => document.execCommand("insertUnorderedList", false, null)}>&bull; List</button>
               <button type="button" className="wys-btn" style={{ minWidth: 110 }} onClick={() => document.execCommand("insertOrderedList", false, null)}>Numbered List</button>
-
-              {/* Horizontal rule */}
               <button type="button" className="wys-btn" style={{ minWidth: 56 }} onClick={() => document.execCommand("insertHorizontalRule", false, null)}>Line</button>
-
-              {/* Link helper */}
               <button type="button" className="wys-btn" style={{ minWidth: 56 }} onClick={() => {
                 const url = window.prompt("Enter URL");
                 if (url && wysiwygRef.current) document.execCommand("createLink", false, url);
@@ -1108,21 +1492,19 @@ export default function AdminPanel() {
               }}
               onPaste={(e) => {
                 e.preventDefault();
-                // Insert plain text to avoid pasted styles; sanitize on save as well.
                 const text = (e.clipboardData || window.clipboardData).getData('text/plain');
                 document.execCommand('insertText', false, text);
               }}
               style={{ whiteSpace: "pre-wrap" }}
             />
 
-            { /* Show ImageUploader for all types (optional for Directory) when workerUrl available and online */ }
             { ImageUploader && workerUrl && isOnline ? (
-           <ImageUploader
-  key={`${uploaderKey}-${editingPostId || "new"}`}
-  workerUrl={workerUrl}
-  postId={editingPostId || "temp"}
-  onUploaded={handleUploaded}
-/>
+              <ImageUploader
+                key={`${uploaderKey}-${editingPostId || "new"}`}
+                workerUrl={workerUrl}
+                postId={editingPostId || "temp"}
+                onUploaded={handleUploaded}
+              />
             ) : (!isOnline ? (
               <div className="muted" style={{ marginTop: 8 }}>Offline — image uploads disabled until you're online.</div>
             ) : null) }
@@ -1135,6 +1517,37 @@ export default function AdminPanel() {
                 <input className="text-input" value={postForm.youtubeInput} onChange={(e) => updatePostForm({ youtubeInput: e.target.value })} placeholder="https://youtu.be/xxxx or ID" />
                 {fieldMessages.youtube && <div className="account-message error-text">{fieldMessages.youtube}</div>}
               </>
+            )}
+
+            { (postForm.type || "").toLowerCase() === "directory" && (
+              <div style={{ marginTop: 12 }}>
+                <label className="form-label">Location (optional — only for Directory)</label>
+                <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <select className="text-input" value={postForm.locationCountryId || ""} onChange={(e) => {
+                    const val = e.target.value || null;
+                    updatePostForm({ locationCountryId: val, locationProvinceId: null, locationCityId: null });
+                  }}>
+                    <option value="">None (country)</option>
+                    {(locationsFlat || []).filter(l => l.type === "country").sort((a,b) => (a.name||'').localeCompare(b.name||'')).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+
+                  <select className="text-input" value={postForm.locationProvinceId || ""} onChange={(e) => {
+                    const val = e.target.value || null;
+                    updatePostForm({ locationProvinceId: val, locationCityId: null });
+                  }} disabled={!postForm.locationCountryId}>
+                    <option value="">None (province)</option>
+                    {(locationsFlat || []).filter(l => l.type === "province" && (!postForm.locationCountryId || l.parentId === postForm.locationCountryId)).sort((a,b) => (a.name||'').localeCompare(b.name||'')).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+
+                  <select className="text-input" value={postForm.locationCityId || ""} onChange={(e) => {
+                    const val = e.target.value || null;
+                    updatePostForm({ locationCityId: val });
+                  }} disabled={!postForm.locationProvinceId}>
+                    <option value="">None (city)</option>
+                    {(locationsFlat || []).filter(l => l.type === "city" && (!postForm.locationProvinceId || l.parentId === postForm.locationProvinceId)).sort((a,b) => (a.name||'').localeCompare(b.name||'')).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
             )}
 
             <div className="inline-checkbox-row" style={{ marginTop: 12 }}>
@@ -1156,27 +1569,11 @@ export default function AdminPanel() {
         </div>
 
         <div className={activeSection === "categories" ? "admin-tab active" : "admin-tab"}>
-          {renderCategoriesList()}
+          {renderCategoriesTab()}
+        </div>
 
-          <hr style={{ margin: "18px 0", borderColor: "rgba(255,255,255,0.04)" }} />
-
-          <h3 className="carousel-title">{editingCategoryId ? "Edit Category" : "Add Category"}</h3>
-
-          <div className="mt-12">
-            <input ref={categoryInputRef} className="text-input" placeholder="Category name" value={categoryFormName} onChange={(e) => { setCategoryFormName(e.target.value); setFieldMessages((p) => ({ ...p, category: "" })); }} />
-            <div style={{ marginTop: 8 }}>
-              {editingCategoryId ? (
-                <>
-                  <button className="account-action-btn" onClick={saveEditCategory} disabled={!isOnline || !isAdmin}>Save</button>
-                  <button className="see-all-link" onClick={() => { setEditingCategoryId(null); setCategoryFormName(""); }}>Cancel</button>
-                </>
-              ) : (
-                <button className="account-action-btn" onClick={handleAddCategory} disabled={!isOnline || !isAdmin}>Add Category</button>
-              )}
-            </div>
-          </div>
-
-          {fieldMessages.category && <div className={`account-message ${fieldMessages.category.includes("created") || fieldMessages.category.includes("updated") ? "success-text" : "error-text"} mt-12`}>{fieldMessages.category}</div>}
+        <div className={activeSection === "locations" ? "admin-tab active" : "admin-tab"}>
+          {renderLocationsTab()}
         </div>
 
         <div className={activeSection === "featured" ? "admin-tab active" : "admin-tab"}>
@@ -1209,8 +1606,8 @@ export default function AdminPanel() {
                     <img src={p.thumbnailUrl || p.imageUrl || "/images/placeholder.png"} alt="" className="item-thumb" />
                     <div>
                       <div className="detail-title" style={{ fontSize: 16 }}>{p.title}</div>
-                      {/* Make metadata font-size match Posts listing */}
                       <div className="muted" style={{ fontSize: 13 }}>{displayType(p.type)} • {(p.categories || []).map(cid => (categories.find(c => c.id === cid) || {}).name || cid).join(", ")}</div>
+                      {p.location && <div style={{ color: "var(--cream)", fontSize: 13, marginTop: 6 }}>{[p.location.countryName, p.location.provinceName, p.location.cityName].filter(Boolean).join(", ")}</div>}
                     </div>
                   </div>
                   <div className="admin-row-actions">
@@ -1230,7 +1627,6 @@ export default function AdminPanel() {
             {fieldMessages.users && <div style={{ marginTop: 12 }} className={`account-message ${fieldMessages.users.includes("Failed") || fieldMessages.users.includes("Permission") ? "error-text" : "success-text"}`}>{fieldMessages.users}</div>}
           </div>
         )}
-
       </div>
     </div>
   );

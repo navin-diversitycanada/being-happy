@@ -1,8 +1,7 @@
 // src/pages/Home.jsx
 // Updated:
-// - Home directories carousel now uses the exact same .card markup used on the Directories page (class="card")
-//   but without an <img>. This makes Home directory cards match the Directories page card layout/spacing
-//   (same .card/.card-content structure as featured directory cards) while omitting images.
+// - Home featured carousel now requests up to 12 featured posts excluding directories
+// - Other home carousels continue to request by-type lists as before (unchanged)
 
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -53,9 +52,9 @@ export default function Home() {
         if (!mounted) return;
         setCatsMap(map);
 
-        // Featured (limit to 12)
-        const feats = await listFeatured(12).catch(() => []);
-        setFeatured((feats || []).slice(0, 12));
+        // Featured (limit to 12) — request up to 12 featured items that are NOT directories
+        const feats = await listFeatured(12, null, "directory").catch(() => []);
+        setFeatured(feats || []);
 
         // Fetch type lists (limit to 12)
         const [arts, vids, auds, dirs] = await Promise.all([
@@ -112,33 +111,33 @@ export default function Home() {
     );
   }
 
-  // Home media card: uses .card sizing but no image; shows title (2 lines), categories in salmon, then excerpt (2 lines)
+  // Media Home card: now image + no excerpt (image card like Featured)
   function renderMediaHomeCard(item) {
     const type = (item.type || "").toLowerCase();
     const url = type === "article" ? `/article/${item.id}` : type === "audio" ? `/audio/${item.id}` : type === "video" ? `/video/${item.id}` : `/directory/${item.id}`;
-    const excerpt = excerptText(item.content || item.excerpt || "", 120);
+    const img = imageForItem(item);
     const cats = (item.categories || []).map(cid => catsMap[cid] || cid).filter(Boolean);
     const catLabel = cats.length ? cats.slice(0, 2).join(", ") : "";
     return (
       <Link key={item.id} className="card" to={url}>
+        <img className="card-img" src={img} alt={item.title} />
         <div className="card-content">
           <div className="card-title">{item.title}</div>
-          {catLabel ? <div className="card-categories">{catLabel}</div> : null}
-          <div className="card-excerpt">{excerpt}</div>
+          {catLabel ? <div className="card-categories">{catLabel}</div> : <div className="card-meta">{type === "article" ? "Article" : type === "audio" ? "Audio" : type === "video" ? "Video" : "Directory"}</div>}
         </div>
       </Link>
     );
   }
 
-  // Directory card for Home: use the same .card markup used on the Directories page (no <img> here)
-  // This matches the Featured/Directories page card structure but without showing images on Home.
+  // Directory card for Home: use the same .card as Directories/Featured (with image)
   function renderDirectoryHomeCard(item) {
     const url = `/directory/${item.id}`;
+    const img = imageForItem(item);
     const cats = (item.categories || []).map(cid => catsMap[cid] || cid).filter(Boolean);
     const meta = cats.length ? cats.slice(0,2).join(", ") : (item.tags || []).slice(0,3).join(" • ");
     return (
-      // Use the same "card" class as Directories' featured cards but omit the <img>
       <Link key={item.id} className="card" to={url}>
+        <img className="card-img" src={img} alt={item.title} />
         <div className="card-content">
           <div className="card-title">{item.title}</div>
           {meta ? <div className="card-categories">{meta}</div> : <div className="card-meta">Directory</div>}
@@ -179,7 +178,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Articles (home media cards) */}
+        {/* Articles (home image cards) */}
         <section className="carousel-section">
           <div className="carousel-header">
             <span className="carousel-title">Articles</span>
@@ -201,7 +200,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Meditation (home media cards) */}
+        {/* Meditation (home image cards) */}
         <section className="carousel-section">
           <div className="carousel-header">
             <span className="carousel-title">Meditation</span>
@@ -223,7 +222,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Video Library (home media cards) */}
+        {/* Video Library (home image cards) */}
         <section className="carousel-section">
           <div className="carousel-header">
             <span className="carousel-title">Video Library</span>
@@ -245,7 +244,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Directories on Home: reuse the same .card used on Directories page but omit images */}
+        {/* Directories on Home: reuse the same .card used on Directories page (image cards) */}
         <section className="carousel-section">
           <div className="carousel-header">
             <span className="carousel-title">Directories</span>

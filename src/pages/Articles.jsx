@@ -1,5 +1,6 @@
 // src/pages/Articles.jsx
 // Changes:
+// - Use listFeatured(12, 'article') to fetch up to 12 latest featured article posts for the Featured carousel.
 // - Deduplicate search results (featured + articles combined) to prevent duplicates when searching.
 
 import React, { useEffect, useState } from "react";
@@ -39,7 +40,7 @@ export default function Articles() {
       setLoading(true);
       try {
         const [feats, cats, list] = await Promise.all([
-          listFeatured(12).catch(() => []),
+          listFeatured(12, "article").catch(() => []),
           listCategories().catch(() => []),
           listByType("article", 12).catch(() => [])
         ]);
@@ -48,9 +49,8 @@ export default function Articles() {
         (cats || []).forEach(c => { catMap[c.id] = c.name; });
         setCatsMap(catMap);
 
-        // featured only articles here
-        const featsArticles = (feats || []).filter(f => (f.type || "").toLowerCase() === "article");
-        setFeatured(featsArticles.slice(0, 12));
+        // featured already limited to article type
+        setFeatured(feats.slice(0, 12));
 
         // Keep the full list (include featured items) for the grid
         setArticles(list || []);
